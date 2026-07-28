@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.models.tenant import TenantStatus
+
 
 class DoctorSeed(BaseModel):
     full_name: str = Field(min_length=1, max_length=255)
@@ -31,10 +33,10 @@ class TenantSummary(BaseModel):
     tenant_id: str
     name: str
     country: str
-    is_active: bool
+    status: TenantStatus
     created_at: datetime
 
 
 class TenantUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
-    is_active: bool | None = None
+    status: TenantStatus | None = None

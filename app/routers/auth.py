@@ -22,7 +22,7 @@ from app.dependencies.auth import (
     verify_password,
 )
 from app.dependencies.db import get_db
-from app.models.tenant import RevokedToken, Tenant, User
+from app.models.tenant import RevokedToken, Tenant, TenantStatus, User
 from app.routers._utils import audit_mutation, commit_or_409
 from app.schemas.auth import (
     LoginResponse,
@@ -98,7 +98,7 @@ def login(data: LoginRequest):
     db: Session = tenant_session_factory()
     try:
         tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
-        if tenant is not None and not tenant.is_active:
+        if tenant is not None and tenant.status != TenantStatus.active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
 
         user = (
@@ -142,15 +142,15 @@ def verify_2fa(data: TwoFAVerifyRequest):
     db = _tenant_session(tenant_id)
     try:
         row = (
-            db.query(User, Tenant.is_active)
+            db.query(User, Tenant.status)
             .outerjoin(Tenant, Tenant.id == User.tenant_id)
             .filter(User.id == __import__("uuid").UUID(payload["sub"]).bytes, User.tenant_id == tenant_id, User.deleted_at.is_(None))
             .first()
         )
         if not row or not row[0].is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
-        user, tenant_is_active = row
-        if tenant_is_active is not None and not tenant_is_active:
+        user, tenant_status = row
+        if tenant_status is not None and tenant_status != TenantStatus.active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
         return TwoFAVerifyResponse(access_token=create_access_token(user), refresh_token=create_refresh_token(user), user=user)
     finally:
@@ -171,15 +171,15 @@ def refresh_token(data: RefreshTokenRequest):
         # be able to keep minting new access tokens. Single joined query, same
         # tenant connection already open for the user lookup.
         row = (
-            db.query(User, Tenant.is_active)
+            db.query(User, Tenant.status)
             .outerjoin(Tenant, Tenant.id == User.tenant_id)
             .filter(User.id == __import__("uuid").UUID(payload["sub"]).bytes, User.tenant_id == tenant_id, User.deleted_at.is_(None))
             .first()
         )
         if not row or not row[0].is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
-        user, tenant_is_active = row
-        if tenant_is_active is not None and not tenant_is_active:
+        user, tenant_status = row
+        if tenant_status is not None and tenant_status != TenantStatus.active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
         return RefreshTokenResponse(access_token=create_access_token(user))
     finally:

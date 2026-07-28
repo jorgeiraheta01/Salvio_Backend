@@ -110,9 +110,12 @@ def auth_headers(token: str) -> dict:
 
 
 def set_tenant_active(api, platform_token: str, tenant_id: str, is_active: bool) -> None:
+    """Grupo B: is_active (booleano) fue reemplazado por status (enum
+    active/suspended/archived) -- esta firma se mantiene (is_active: bool)
+    para no tocar las pruebas que ya la llamaban, solo cambia el body real."""
     resp = api.patch(
         f"{BASE_URL}/api/v1/tenants/{tenant_id}",
-        json={"is_active": is_active},
+        json={"status": "active" if is_active else "suspended"},
         headers=auth_headers(platform_token),
     )
     resp.raise_for_status()

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import sessionmaker
 
 from app.database import get_control_engine
@@ -58,9 +58,10 @@ def provision_tenant(
 
 @router.get("", response_model=list[TenantSummary])
 def get_tenants(
+    include_archived: bool = Query(default=False),
     _current_admin: PlatformAdmin = Depends(get_current_platform_admin),
 ) -> list[TenantSummary]:
-    return [TenantSummary(**t) for t in list_tenants()]
+    return [TenantSummary(**t) for t in list_tenants(include_archived=include_archived)]
 
 
 @router.patch("/{tenant_id}", response_model=TenantSummary)
@@ -70,13 +71,13 @@ def patch_tenant(
     request: Request,
     current_admin: PlatformAdmin = Depends(get_current_platform_admin),
 ) -> TenantSummary:
-    result = update_tenant(tenant_id, name=payload.name, is_active=payload.is_active)
+    result = update_tenant(tenant_id, name=payload.name, status=payload.status)
     _log(
         current_admin,
         request,
         action="update_tenant",
         table_name="tenants",
         tenant_id=tenant_id,
-        new_values={"name": payload.name, "is_active": payload.is_active},
+        new_values={"name": payload.name, "status": payload.status.value if payload.status else None},
     )
     return TenantSummary(**result)

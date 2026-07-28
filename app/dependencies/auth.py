@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import get_tenant_engine
 from app.dependencies.db import get_db
-from app.models.tenant import RevokedToken, Tenant, User, UserRole
+from app.models.tenant import RevokedToken, Tenant, TenantStatus, User, UserRole
 from app.utils.password import normalize_password, pwd_context
 
 security = HTTPBearer(auto_error=True)
@@ -86,7 +86,7 @@ def get_current_user(
         # extra connection and no extra query -- just one more WHERE clause on
         # a query that already had to run.
         row = (
-            tenant_db.query(User, Tenant.is_active)
+            tenant_db.query(User, Tenant.status)
             .outerjoin(Tenant, Tenant.id == User.tenant_id)
             .filter(User.id == _uuid_bytes(user_id), User.tenant_id == tenant_id, User.deleted_at.is_(None))
             .first()
@@ -96,10 +96,13 @@ def get_current_user(
 
     if not row:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
-    user, tenant_is_active = row
+    user, tenant_status = row
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
-    if tenant_is_active is not None and not tenant_is_active:
+    # Grupo B: tanto "suspended" como "archived" cortan la sesion igual que
+    # antes lo hacia is_active=False (H-09) -- solo el listado del owner
+    # distingue entre ambos (archived se oculta por defecto).
+    if tenant_status is not None and tenant_status != TenantStatus.active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
     return user
 

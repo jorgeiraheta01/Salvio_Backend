@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.database import DATABASE_URL
-from app.models.tenant import Tenant, User, UserRole
+from app.models.tenant import Tenant, TenantStatus, User, UserRole
 from app.utils.password import normalize_password, pwd_context
 
 TENANT_ID_PATTERN = re.compile(r"^[a-z0-9_]+$")
@@ -133,7 +133,7 @@ def _seed_tenant_row_and_users(
     try:
         tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
         if tenant is None:
-            tenant = Tenant(id=tenant_id, name=tenant_name, country="SV", is_active=True)
+            tenant = Tenant(id=tenant_id, name=tenant_name, country="SV", status=TenantStatus.active)
             db.add(tenant)
 
         all_emails = [admin_email, *[doc["email"] for doc in doctors]]
@@ -238,7 +238,7 @@ def create_tenant(
 _RESERVED_DB_NAMES = {"salvio_control", "salvio_tenant_template"}
 
 
-def list_tenants() -> list[dict]:
+def list_tenants(include_archived: bool = False) -> list[dict]:
     admin_engine = create_engine(_server_database_url(), pool_pre_ping=True)
     try:
         with admin_engine.connect() as connection:
@@ -258,13 +258,13 @@ def list_tenants() -> list[dict]:
             db: Session = session_factory()
             try:
                 tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
-                if tenant is not None:
+                if tenant is not None and (include_archived or tenant.status != TenantStatus.archived):
                     tenants.append(
                         {
                             "tenant_id": tenant.id,
                             "name": tenant.name,
                             "country": tenant.country,
-                            "is_active": tenant.is_active,
+                            "status": tenant.status,
                             "created_at": tenant.created_at,
                         }
                     )
@@ -281,7 +281,7 @@ def list_tenants() -> list[dict]:
     return tenants
 
 
-def update_tenant(tenant_id: str, name: str | None, is_active: bool | None) -> dict:
+def update_tenant(tenant_id: str, name: str | None, status: TenantStatus | None) -> dict:
     safe_tenant_id = _validate_tenant_id(tenant_id)
     db_name = _database_name(safe_tenant_id)
 
@@ -303,15 +303,15 @@ def update_tenant(tenant_id: str, name: str | None, is_active: bool | None) -> d
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found.")
         if name is not None:
             tenant.name = name.strip()
-        if is_active is not None:
-            tenant.is_active = is_active
+        if status is not None:
+            tenant.status = status
         db.commit()
         db.refresh(tenant)
         return {
             "tenant_id": tenant.id,
             "name": tenant.name,
             "country": tenant.country,
-            "is_active": tenant.is_active,
+            "status": tenant.status,
             "created_at": tenant.created_at,
         }
     except HTTPException:
