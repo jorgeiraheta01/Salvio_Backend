@@ -42,6 +42,7 @@ def create_appointment(
 @router.get("", response_model=list[AppointmentRead])
 def list_appointments(
     doctor_id: UUID | None = Query(default=None),
+    patient_id: UUID | None = Query(default=None),
     date: date_type | None = Query(default=None),
     status_filter: AppointmentStatus | None = Query(default=None, alias="status"),
     db: Session = Depends(get_db),
@@ -50,11 +51,13 @@ def list_appointments(
     query = db.query(Appointment).filter(Appointment.tenant_id == current_user.tenant_id, Appointment.deleted_at.is_(None))
     if doctor_id:
         query = query.filter(Appointment.doctor_id == uuid_bytes(doctor_id))
+    if patient_id:
+        query = query.filter(Appointment.patient_id == uuid_bytes(patient_id))
     if status_filter:
         query = query.filter(Appointment.status == status_filter)
     if date:
         query = query.filter(Appointment.scheduled_at >= date, Appointment.scheduled_at < date_type.fromordinal(date.toordinal() + 1))
-    return query.order_by(Appointment.scheduled_at.asc()).all()
+    return query.order_by(Appointment.scheduled_at.desc()).all()
 
 
 @router.patch("/{appointment_id}/status", response_model=AppointmentRead)

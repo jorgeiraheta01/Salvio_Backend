@@ -1,5 +1,5 @@
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -32,6 +32,7 @@ def log_audit(
 ) -> None:
     db.add(
         AuditLog(
+            id=uuid4().bytes,
             tenant_id=tenant_id,
             user_id=_uuid_to_bytes(user_id),
             action=action,

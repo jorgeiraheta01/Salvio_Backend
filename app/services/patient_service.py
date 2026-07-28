@@ -55,7 +55,9 @@ def update_patient(db: Session, patient_id: bytes, tenant_id: str, data: Patient
         duplicate = db.query(Patient).filter(Patient.tenant_id == tenant_id, Patient.dui == payload["dui"], Patient.id != patient_id).first()
         if duplicate:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A patient with this DUI already exists in this tenant.")
-    for key, value in data_for_model(data, Patient).items():
+    update_payload = data_for_model(data, Patient)
+    update_payload.pop("id", None)  # data_for_model auto-generates an id for create paths; never apply it on update
+    for key, value in update_payload.items():
         setattr(patient, key, value)
     audit(db, user_id=user_id, tenant_id=tenant_id, action="UPDATE", table_name="patients", record_id=patient.id, old_values=old, new_values=model_to_dict(patient))
     commit_or_409(db)

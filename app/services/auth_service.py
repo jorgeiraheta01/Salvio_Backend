@@ -4,13 +4,12 @@ from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.models.tenant import OtpTokenSms, RevokedToken, User
 from app.services._utils import commit_or_409, new_uuid_bytes
+from app.utils.password import normalize_password, pwd_context
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY") or "salvio-dev-secret-change-me"
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
@@ -22,9 +21,9 @@ def authenticate_user(db: Session, email: str, password: str) -> User | None:
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive.")
     try:
-        valid = pwd_context.verify(password, user.hashed_password)
+        valid = pwd_context.verify(normalize_password(password), user.hashed_password)
     except Exception:
-        valid = password == user.hashed_password
+        valid = normalize_password(password) == user.hashed_password
     return user if valid else None
 
 
@@ -97,7 +96,7 @@ def verify_otp_sms(db: Session, user_id: bytes, code: str) -> bool:
     )
     if not token:
         return False
-    valid = pwd_context.verify(code, token.otp_code_hash) if token.otp_code_hash else False
+    valid = pwd_context.verify(normalize_password(code), token.otp_code_hash) if token.otp_code_hash else False
     if valid:
         token.used = True
         commit_or_409(db)

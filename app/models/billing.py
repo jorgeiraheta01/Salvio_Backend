@@ -28,6 +28,7 @@ class Billing(Base):
     status = Column(SQLEnum(BillingStatus), nullable=False, default="pending")
     payment_method = Column(String(50), nullable=True)
     payment_date = Column(DateTime, nullable=True)
+    due_date = Column(DateTime, nullable=True)
     invoice_number = Column(String(50), nullable=True)
     void_reason = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())

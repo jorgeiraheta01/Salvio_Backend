@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from fastapi import HTTPException, status
@@ -19,6 +19,11 @@ def create_billing(db: Session, tenant_id: str, data: BillingCreate, user_id: by
     billing = Billing(**data_for_model(data, Billing, exclude={"items"}, tenant_id=tenant_id))
     billing.id = new_uuid_bytes()
     billing.amount = total_billing
+    if not billing.due_date:
+        billing.due_date = datetime.now(timezone.utc) + timedelta(days=30)
+    if not billing.invoice_number:
+        existing_count = db.query(func.count(Billing.id)).filter(Billing.tenant_id == tenant_id).scalar() or 0
+        billing.invoice_number = str(existing_count + 1)
     db.add(billing)
     db.flush()
     for item in data.items:

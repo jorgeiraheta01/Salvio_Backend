@@ -41,6 +41,7 @@ from app.schemas.clinical import (
     CorrectionNoteCreate,
     PhysicalExamFindingCreate,
     PhysicalExamFindingRead,
+    RecordDiagnosisCreate,
     RecordDiagnosisRead,
     RecordPlanCreate,
     RecordPlanRead,
@@ -199,6 +200,31 @@ def list_record_diagnoses(
     current_user: User = Depends(get_current_user),
 ):
     return _list_record_children(db, current_user, record_id, RecordDiagnosis)
+
+
+@router.post("/{record_id}/diagnoses", response_model=RecordDiagnosisRead, status_code=status.HTTP_201_CREATED)
+def create_record_diagnosis(
+    record_id: UUID,
+    data: RecordDiagnosisCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(*CLINICAL_EDIT_ROLES)),
+):
+    record = _record_or_404(db, record_id, current_user.tenant_id)
+    _ensure_draft(record)
+    if data.is_primary_diagnosis:
+        existing_primary = (
+            db.query(RecordDiagnosis)
+            .filter(
+                RecordDiagnosis.clinical_record_id == record.id,
+                RecordDiagnosis.tenant_id == current_user.tenant_id,
+                RecordDiagnosis.is_primary_diagnosis.is_(True),
+            )
+            .first()
+        )
+        if existing_primary:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only one primary diagnosis is allowed per clinical record.")
+    return _create_record_child(db, request, current_user, record_id, RecordDiagnosis, data)
 
 
 _subresource("vital-signs", VitalSign, VitalSignCreate, VitalSignRead, exclude={"alert", "bmi_calculated"})

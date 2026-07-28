@@ -38,6 +38,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
     role = Column(SQLEnum(UserRole), nullable=False)
+    specialty = Column(String(255), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     deleted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())

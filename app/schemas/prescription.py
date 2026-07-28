@@ -69,11 +69,12 @@ class PrescriptionItemRead(PrescriptionItemBase):
 
 
 class PrescriptionBase(StrippedStringMixin, ORMModel):
-    patient_id: UUID
-    tenant_id: str = Field(max_length=50)
+    patient_id: UUID | None = None
+    tenant_id: str | None = Field(default=None, max_length=50)
+    encounter_id: UUID | None = None
     clinical_record_id: UUID | None = None
-    prescribed_by: UUID
-    prescribed_by_name: str = Field(min_length=1, max_length=255)
+    prescribed_by: UUID | None = None
+    prescribed_by_name: str | None = Field(default=None, min_length=1, max_length=255)
     prescribed_at: datetime | None = None
     pdf_url: str | None = Field(default=None, max_length=500)
     status: PrescriptionStatus = PrescriptionStatus.active
@@ -85,6 +86,8 @@ class PrescriptionCreate(PrescriptionBase):
 
     @model_validator(mode="after")
     def flag_known_allergies(self):
+        if self.patient_id is None and self.encounter_id is None:
+            raise ValueError("patient_id or encounter_id is required.")
         if self.known_allergy_alerts:
             for item in self.medications:
                 item.status = PrescriptionItemStatus.suspended
@@ -99,6 +102,8 @@ class PrescriptionUpdate(StrippedStringMixin, ORMModel):
 class PrescriptionRead(PrescriptionBase):
     id: UUID
     created_at: datetime
+    updated_at: datetime | None = None
+    version: int = 1
     items: list[PrescriptionItemRead] = Field(default_factory=list)
 
 

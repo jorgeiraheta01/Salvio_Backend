@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Any
@@ -48,7 +48,7 @@ def clean_value(value: Any) -> Any:
         return str(value)
     if isinstance(value, (bytes, bytearray)) and len(value) == 16:
         return str(UUID(bytes=bytes(value)))
-    if isinstance(value, datetime):
+    if isinstance(value, (datetime, date)):
         return value.isoformat()
     if isinstance(value, Decimal):
         return str(value)
@@ -71,7 +71,11 @@ def data_for_model(data: Any, model: Any, *, exclude: set[str] | None = None, te
     for key, value in payload.items():
         if key not in columns:
             continue
-        if key != "tenant_id" and (key.endswith("_id") or key in {"id", "user_id", "record_id", "signed_by", "recorded_by", "created_by"}):
+        # See app/services/_utils.py:data_for_model for why we check the value's
+        # actual type instead of relying solely on a name-based whitelist.
+        if isinstance(value, UUID):
+            result[key] = uuid_bytes(value)
+        elif key != "tenant_id" and (key.endswith("_id") or key in {"id", "user_id", "record_id", "signed_by", "recorded_by", "created_by"}):
             result[key] = uuid_bytes(value)
         else:
             result[key] = value

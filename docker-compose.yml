@@ -5,7 +5,7 @@ services:
     image: mysql:8.0
     container_name: salvio_mysql
     environment:
-      MYSQL_ROOT_PASSWORD: rootroot
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
       MYSQL_DATABASE: salvio_tenant_template
     ports:
       - "3306:3306"

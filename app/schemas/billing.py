@@ -17,6 +17,7 @@ class BillingBase(StrippedStringMixin, ORMModel):
     status: BillingStatus = BillingStatus.pending
     payment_method: str | None = Field(default=None, max_length=50)
     payment_date: datetime | None = None
+    due_date: datetime | None = None
     invoice_number: str | None = Field(default=None, max_length=50)
     void_reason: str | None = None
 

@@ -1,1303 +1,1357 @@
-
-CREATE TABLE IF NOT EXISTS audit_log (
-	id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50), 
-	user_id BINARY(16), 
-	action VARCHAR(50) NOT NULL, 
-	table_name VARCHAR(100) NOT NULL, 
-	record_id BINARY(16), 
-	old_values JSON, 
-	new_values JSON, 
-	ip_address VARCHAR(45), 
-	user_agent TEXT, 
-	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, 
-	PRIMARY KEY (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS clinical_systems_catalog (
-	id BINARY(16) NOT NULL, 
-	system_name VARCHAR(100) NOT NULL, 
-	applies_to SET('exam','review') NOT NULL, 
-	sort_order TINYINT NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	UNIQUE (system_name)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS development_milestones_config (
-	id BINARY(16) NOT NULL, 
-	milestone_name VARCHAR(255) NOT NULL, 
-	category ENUM('motor_gross','motor_fine','communication_language','cognitive','social_emotional') NOT NULL, 
-	age_median_months NUMERIC(5, 1) NOT NULL, 
-	alert_age_months NUMERIC(5, 1) NOT NULL, 
-	description TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS lab_tests_catalog (
-	id BINARY(16) NOT NULL, 
-	test_code VARCHAR(20) NOT NULL, 
-	test_name VARCHAR(255) NOT NULL, 
-	category VARCHAR(100), 
-	unit VARCHAR(50), 
-	ref_range VARCHAR(100), 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	UNIQUE (test_code)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS tenants (
-	id VARCHAR(50) NOT NULL, 
-	name VARCHAR(255) NOT NULL, 
-	country VARCHAR(2) NOT NULL, 
-	is_active BOOL NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS facilities (
-	id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	name VARCHAR(255) NOT NULL, 
-	facility_type VARCHAR(100), 
-	phone VARCHAR(30), 
-	email VARCHAR(255), 
-	address TEXT, 
-	is_active BOOL NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS hc_templates (
-	id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	specialty VARCHAR(100) NOT NULL, 
-	require_insurance_affiliation BOOL NOT NULL, 
-	require_labor_data BOOL NOT NULL, 
-	require_attention_number BOOL NOT NULL, 
-	show_glasgow_scale BOOL NOT NULL, 
-	show_triage BOOL NOT NULL, 
-	show_pediatric_perinatal BOOL NOT NULL, 
-	show_clinical_scales BOOL NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS medication_catalog (
-	id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50), 
-	medication_code VARCHAR(50), 
-	generic_name VARCHAR(255) NOT NULL, 
-	brand_name VARCHAR(255), 
-	concentration VARCHAR(100), 
-	pharmaceutical_form VARCHAR(100), 
-	route VARCHAR(100), 
-	is_controlled BOOL NOT NULL, 
-	is_active BOOL NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patients (
-	id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	medical_record_number VARCHAR(50) NOT NULL, 
-	first_name VARCHAR(100) NOT NULL, 
-	last_name VARCHAR(100) NOT NULL, 
-	date_of_birth DATE NOT NULL, 
-	gender ENUM('male','female','other') NOT NULL, 
-	dui VARCHAR(10), 
-	nit VARCHAR(20), 
-	email VARCHAR(255), 
-	phone VARCHAR(30), 
-	address TEXT, 
-	emergency_contact_name VARCHAR(255), 
-	emergency_contact_phone VARCHAR(30), 
-	emergency_contact_relationship VARCHAR(100), 
-	insurance_type ENUM('particular','ss_pensionado','ss_cotizante','ss_beneficiario','red_publica','privado','ninguno','otro') NOT NULL, 
-	insurance_number VARCHAR(50), 
-	attention_number VARCHAR(50), 
-	last_employer VARCHAR(255), 
-	work_phone VARCHAR(30), 
-	last_occupation VARCHAR(200), 
-	last_contribution_period VARCHAR(50), 
-	last_work_date DATE, 
-	deleted_at DATETIME, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS users (
-	id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	email VARCHAR(255) NOT NULL, 
-	hashed_password VARCHAR(255) NOT NULL, 
-	full_name VARCHAR(255) NOT NULL, 
-	`role` ENUM('super_admin','clinic_admin','doctor','resident','nurse','receptionist','accountant','patient') NOT NULL, 
-	is_active BOOL NOT NULL, 
-	deleted_at DATETIME, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	UNIQUE (email)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS appointments (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	doctor_id BINARY(16) NOT NULL, 
-	scheduled_at DATETIME NOT NULL, 
-	appointment_type VARCHAR(100), 
-	status ENUM('scheduled','confirmed','checked_in','in_consultation','completed','cancelled','no_show','rescheduled') NOT NULL, 
-	notes TEXT, 
-	deleted_at DATETIME, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(doctor_id) REFERENCES users (id) ON DELETE RESTRICT
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS departments (
-	id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	facility_id BINARY(16), 
-	name VARCHAR(255) NOT NULL, 
-	specialty VARCHAR(100), 
-	is_clinical BOOL NOT NULL, 
-	is_active BOOL NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(facility_id) REFERENCES facilities (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS medication_inventory (
-	id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	medication_id BINARY(16) NOT NULL, 
-	facility_id BINARY(16), 
-	lot_number VARCHAR(100), 
-	expiration_date DATE, 
-	quantity_on_hand DECIMAL(12, 2) NOT NULL, 
-	minimum_stock DECIMAL(12, 2) NOT NULL, 
-	unit VARCHAR(50), 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(medication_id) REFERENCES medication_catalog (id) ON DELETE RESTRICT, 
-	FOREIGN KEY(facility_id) REFERENCES facilities (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS otp_tokens_sms (
-	id BINARY(16) NOT NULL, 
-	user_id BINARY(16) NOT NULL, 
-	phone_number VARCHAR(30) NOT NULL, 
-	otp_code_hash VARCHAR(64) NOT NULL, 
-	expires_at DATETIME NOT NULL, 
-	used BOOL NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_admissions (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	admission_datetime DATETIME NOT NULL, 
-	discharge_datetime DATETIME, 
-	service VARCHAR(100), 
-	bed_number VARCHAR(20), 
-	admitting_doctor BINARY(16), 
-	admitting_doctor_name VARCHAR(255), 
-	diagnosis_on_admission TEXT, 
-	discharge_diagnosis_cie10 VARCHAR(10), 
-	status ENUM('active','discharged','transferred') NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(admitting_doctor) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_allergies (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	allergen VARCHAR(255) NOT NULL, 
-	reaction VARCHAR(255), 
-	severity ENUM('mild','moderate','severe','life_threatening') NOT NULL, 
-	notes TEXT, 
-	is_active BOOL NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_chronic_diseases (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	disease_name VARCHAR(255) NOT NULL, 
-	cie10_code VARCHAR(10), 
-	diagnosis_date DATE, 
-	is_active BOOL NOT NULL, 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_consents (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	consent_type ENUM('treatment','surgery','anesthesia','data','whatsapp') NOT NULL, 
-	consent_text TEXT NOT NULL, 
-	signed_at DATETIME NOT NULL DEFAULT now(), 
-	signed_by BINARY(16), 
-	pdf_url VARCHAR(500), 
-	revoked_at DATETIME, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(signed_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_development_hx (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	walking_age_months DECIMAL(5, 1), 
-	first_words_age_months DECIMAL(5, 1), 
-	toilet_training_age_months DECIMAL(5, 1), 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	UNIQUE (patient_id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_development_records (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	milestone_id BINARY(16) NOT NULL, 
-	achieved_at DATE, 
-	delay_alert BOOL NOT NULL, 
-	recorded_by BINARY(16), 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(milestone_id) REFERENCES development_milestones_config (id) ON DELETE RESTRICT, 
-	FOREIGN KEY(recorded_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_family_hx (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	relationship VARCHAR(100), 
-	condition_name VARCHAR(255), 
-	cie10_code VARCHAR(10), 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_gynecological_hx (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	menarche_age TINYINT, 
-	last_menstrual_period DATE, 
-	pregnancies TINYINT, 
-	deliveries TINYINT, 
-	abortions TINYINT, 
-	contraceptive_method VARCHAR(255), 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	UNIQUE (patient_id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_hospitalizations_hx (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	admission_date DATE NOT NULL, 
-	discharge_date DATE, 
-	reason TEXT, 
-	hospital VARCHAR(255), 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_immunizations (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	vaccine_name VARCHAR(255) NOT NULL, 
-	dose_number VARCHAR(50), 
-	lot_number VARCHAR(100), 
-	applied_at DATE, 
-	next_due_at DATE, 
-	applied_by BINARY(16), 
-	status ENUM('applied','pending','refused','contraindicated') NOT NULL, 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(applied_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_medications (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	medication_name VARCHAR(255) NOT NULL, 
-	dose VARCHAR(100), 
-	frequency VARCHAR(100), 
-	start_date DATE, 
-	end_date DATE, 
-	is_active BOOL NOT NULL, 
-	prescribed_by BINARY(16), 
-	prescribed_by_name VARCHAR(255), 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(prescribed_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_perinatal_hx (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	gestational_weeks TINYINT, 
-	prenatal_controls TINYINT, 
-	delivery_route ENUM('vaginal','cesarean','forceps'), 
-	birth_weight DECIMAL(6, 2), 
-	birth_length DECIMAL(5, 1), 
-	head_circumference DECIMAL(5, 1), 
-	apgar_1min TINYINT, 
-	apgar_5min TINYINT, 
-	apgar_10min TINYINT, 
-	ballard_weeks TINYINT, 
-	silverman_retractions TINYINT, 
-	silverman_cyanosis TINYINT, 
-	silverman_grunting TINYINT, 
-	silverman_breathing TINYINT, 
-	silverman_auscultation TINYINT, 
-	silverman_total TINYINT, 
-	nicu_admission BOOL, 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	UNIQUE (patient_id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_physiological_hx (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	blood_type VARCHAR(5), 
-	rh_factor ENUM('positive','negative','unknown'), 
-	smoking ENUM('never','former','current') NOT NULL, 
-	alcohol ENUM('never','occasional','daily') NOT NULL, 
-	drugs TEXT, 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	UNIQUE (patient_id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_social_hx (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	occupation VARCHAR(255), 
-	living_conditions TEXT, 
-	housing_type VARCHAR(100), 
-	has_water BOOL, 
-	has_sewer BOOL, 
-	has_electricity BOOL, 
-	pets TEXT, 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	UNIQUE (patient_id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_surgeries (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	surgery_name VARCHAR(255) NOT NULL, 
-	surgery_date DATE, 
-	hospital VARCHAR(255), 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS revoked_tokens (
-	id BINARY(16) NOT NULL, 
-	jti VARCHAR(255) NOT NULL, 
-	user_id BINARY(16) NOT NULL, 
-	expires_at DATETIME NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	UNIQUE (jti), 
-	FOREIGN KEY(user_id) REFERENCES users (id) ON DELETE CASCADE
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS billing (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	appointment_id BINARY(16), 
-	amount DECIMAL(10, 2) NOT NULL, 
-	currency VARCHAR(3) NOT NULL, 
-	status ENUM('pending','paid','void','refunded') NOT NULL, 
-	payment_method VARCHAR(50), 
-	payment_date DATETIME, 
-	invoice_number VARCHAR(50), 
-	void_reason TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(appointment_id) REFERENCES appointments (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS clinical_records (
-	id BINARY(16) NOT NULL, 
-	appointment_id BINARY(16), 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	doctor_id BINARY(16) NOT NULL, 
-	doctor_name VARCHAR(255) NOT NULL, 
-	status ENUM('draft','signed') NOT NULL, 
-	soap_subjective TEXT, 
-	soap_objective TEXT, 
-	soap_assessment TEXT, 
-	soap_plan TEXT, 
-	informant VARCHAR(255), 
-	informant_relationship VARCHAR(100), 
-	visit_number SMALLINT, 
-	printed_at DATETIME, 
-	signed_at DATETIME, 
-	digital_signature TEXT, 
-	deleted_at DATETIME, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(appointment_id) REFERENCES appointments (id) ON DELETE SET NULL, 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(doctor_id) REFERENCES users (id) ON DELETE RESTRICT
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS rooms (
-	id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	facility_id BINARY(16), 
-	department_id BINARY(16), 
-	room_number VARCHAR(50) NOT NULL, 
-	room_type VARCHAR(100), 
-	floor VARCHAR(50), 
-	is_active BOOL NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(facility_id) REFERENCES facilities (id) ON DELETE SET NULL, 
-	FOREIGN KEY(department_id) REFERENCES departments (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS triage_records (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	appointment_id BINARY(16), 
-	admission_id BINARY(16), 
-	received_at DATETIME NOT NULL, 
-	triage_at DATETIME, 
-	nursing_prep_at DATETIME, 
-	priority ENUM('low','moderate','high','critical') NOT NULL, 
-	area VARCHAR(100), 
-	systolic_bp SMALLINT, 
-	diastolic_bp SMALLINT, 
-	heart_rate SMALLINT, 
-	resp_rate TINYINT, 
-	temperature DECIMAL(4, 1), 
-	spo2 TINYINT, 
-	glasgow_total TINYINT, 
-	chief_complaint TEXT, 
-	created_by BINARY(16), 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(appointment_id) REFERENCES appointments (id) ON DELETE SET NULL, 
-	FOREIGN KEY(admission_id) REFERENCES patient_admissions (id) ON DELETE SET NULL, 
-	FOREIGN KEY(created_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS wa_messages (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	appointment_id BINARY(16), 
-	message_type VARCHAR(50), 
-	template_name VARCHAR(100), 
-	status ENUM('pending','sent','failed','delivered','read') NOT NULL, 
-	error_message TEXT, 
-	sent_at DATETIME, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(appointment_id) REFERENCES appointments (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS beds (
-	id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	room_id BINARY(16), 
-	bed_number VARCHAR(50) NOT NULL, 
-	status ENUM('available','occupied','cleaning','maintenance','blocked') NOT NULL, 
-	current_admission_id BINARY(16), 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(room_id) REFERENCES rooms (id) ON DELETE SET NULL, 
-	FOREIGN KEY(current_admission_id) REFERENCES patient_admissions (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS billing_items (
-	id BINARY(16) NOT NULL, 
-	billing_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	item_type VARCHAR(100), 
-	description VARCHAR(255) NOT NULL, 
-	quantity DECIMAL(10, 2) NOT NULL, 
-	unit_price DECIMAL(10, 2) NOT NULL, 
-	discount_amount DECIMAL(10, 2) NOT NULL, 
-	tax_amount DECIMAL(10, 2) NOT NULL, 
-	total_amount DECIMAL(10, 2) NOT NULL, 
-	service_date DATETIME, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(billing_id) REFERENCES billing (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS clinical_notes (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	admission_id BINARY(16), 
-	clinical_record_id BINARY(16), 
-	note_type ENUM('progress','nursing','discharge','other') NOT NULL, 
-	content TEXT NOT NULL, 
-	authored_by BINARY(16), 
-	authored_by_name VARCHAR(255), 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(admission_id) REFERENCES patient_admissions (id) ON DELETE SET NULL, 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE SET NULL, 
-	FOREIGN KEY(authored_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS clinical_problems (
-	id BINARY(16) NOT NULL, 
-	clinical_record_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	problem_name VARCHAR(255) NOT NULL, 
-	is_active BOOL NOT NULL, 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS clinical_procedures (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	clinical_record_id BINARY(16), 
-	consent_id BINARY(16), 
-	procedure_name VARCHAR(255) NOT NULL, 
-	performed_by BINARY(16), 
-	performed_by_name VARCHAR(255), 
-	performed_at DATETIME, 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE SET NULL, 
-	FOREIGN KEY(consent_id) REFERENCES patient_consents (id) ON DELETE SET NULL, 
-	FOREIGN KEY(performed_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS clinical_scale_results (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	clinical_record_id BINARY(16), 
-	scale_name ENUM('barthel','braden','morse','asa','silverman','flacc','eva') NOT NULL, 
-	total_score SMALLINT, 
-	risk_level VARCHAR(50), 
-	details JSON, 
-	performed_by BINARY(16), 
-	performed_at DATETIME NOT NULL DEFAULT now(), 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE SET NULL, 
-	FOREIGN KEY(performed_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS imaging_studies (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	clinical_record_id BINARY(16), 
-	study_type VARCHAR(100) NOT NULL, 
-	body_part VARCHAR(100), 
-	ordered_by BINARY(16), 
-	order_datetime DATETIME NOT NULL DEFAULT now(), 
-	performed_at DATETIME, 
-	result_summary TEXT, 
-	pdf_url VARCHAR(500), 
-	dicom_url VARCHAR(500), 
-	status ENUM('ordered','performed','reviewed','cancelled') NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE SET NULL, 
-	FOREIGN KEY(ordered_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS interconsults (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	clinical_record_id BINARY(16), 
-	requesting_doctor BINARY(16) NOT NULL, 
-	requesting_doctor_name VARCHAR(255) NOT NULL, 
-	consulting_specialty VARCHAR(100) NOT NULL, 
-	reason TEXT, 
-	requested_at DATETIME NOT NULL DEFAULT now(), 
-	response TEXT, 
-	responded_at DATETIME, 
-	status ENUM('pending','accepted','completed','rejected') NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE SET NULL, 
-	FOREIGN KEY(requesting_doctor) REFERENCES users (id) ON DELETE RESTRICT
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS lab_orders (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	clinical_record_id BINARY(16), 
-	ordered_by BINARY(16) NOT NULL, 
-	lab_test_id BINARY(16), 
-	test_name VARCHAR(255) NOT NULL, 
-	order_datetime DATETIME NOT NULL DEFAULT now(), 
-	status ENUM('ordered','collected','processing','completed','cancelled') NOT NULL, 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE SET NULL, 
-	FOREIGN KEY(ordered_by) REFERENCES users (id) ON DELETE RESTRICT, 
-	FOREIGN KEY(lab_test_id) REFERENCES lab_tests_catalog (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_documents (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	clinical_record_id BINARY(16), 
-	category ENUM('identity','consent','clinical','lab','imaging','billing','referral','other') NOT NULL, 
-	title VARCHAR(255) NOT NULL, 
-	file_url VARCHAR(500) NOT NULL, 
-	file_name VARCHAR(255), 
-	mime_type VARCHAR(100), 
-	checksum VARCHAR(128), 
-	uploaded_by BINARY(16), 
-	is_confidential BOOL NOT NULL, 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	deleted_at DATETIME, 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE SET NULL, 
-	FOREIGN KEY(uploaded_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS patient_growth_measurements (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	clinical_record_id BINARY(16), 
-	measured_at DATETIME NOT NULL DEFAULT now(), 
-	weight DECIMAL(6, 2), 
-	height DECIMAL(5, 1), 
-	head_circumference DECIMAL(5, 1), 
-	bmi DECIMAL(5, 2), 
-	weight_percentile DECIMAL(5, 2), 
-	height_percentile DECIMAL(5, 2), 
-	bmi_percentile DECIMAL(5, 2), 
-	recorded_by BINARY(16), 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE SET NULL, 
-	FOREIGN KEY(recorded_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS payments (
-	id BINARY(16) NOT NULL, 
-	billing_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	amount DECIMAL(10, 2) NOT NULL, 
-	currency VARCHAR(3) NOT NULL, 
-	payment_method VARCHAR(50) NOT NULL, 
-	reference_number VARCHAR(100), 
-	status ENUM('pending','completed','failed','refunded','void') NOT NULL, 
-	paid_at DATETIME, 
-	processed_by BINARY(16), 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(billing_id) REFERENCES billing (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(processed_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS physical_exam_findings (
-	id BINARY(16) NOT NULL, 
-	clinical_record_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	system_name VARCHAR(100) NOT NULL, 
-	is_normal BOOL, 
-	findings TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS prescriptions (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	clinical_record_id BINARY(16), 
-	prescribed_by BINARY(16) NOT NULL, 
-	prescribed_by_name VARCHAR(255) NOT NULL, 
-	prescribed_at DATETIME NOT NULL DEFAULT now(), 
-	pdf_url VARCHAR(500), 
-	status ENUM('pending_override','active','dispensed','cancelled') NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE SET NULL, 
-	FOREIGN KEY(prescribed_by) REFERENCES users (id) ON DELETE RESTRICT
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS record_plans (
-	id BINARY(16) NOT NULL, 
-	clinical_record_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	plan_type VARCHAR(100), 
-	description TEXT, 
-	due_date DATE, 
-	completed_at DATETIME, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS referrals (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	clinical_record_id BINARY(16), 
-	referral_type ENUM('internal','internal_transfer','cross_tenant','public') NOT NULL, 
-	source_service VARCHAR(100), 
-	destination_area VARCHAR(100), 
-	transfer_reason TEXT, 
-	referred_by BINARY(16), 
-	referred_by_name VARCHAR(255), 
-	target_tenant_id VARCHAR(50), 
-	status ENUM('pending','accepted','completed','rejected') NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE SET NULL, 
-	FOREIGN KEY(referred_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS review_of_systems (
-	id BINARY(16) NOT NULL, 
-	clinical_record_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	system_name VARCHAR(100) NOT NULL, 
-	is_positive BOOL, 
-	comments TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS vital_signs (
-	id BINARY(16) NOT NULL, 
-	patient_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	clinical_record_id BINARY(16), 
-	recorded_at DATETIME NOT NULL DEFAULT now(), 
-	bp_systolic SMALLINT, 
-	bp_diastolic SMALLINT, 
-	heart_rate SMALLINT, 
-	resp_rate TINYINT, 
-	temperature DECIMAL(4, 1), 
-	spo2 TINYINT, 
-	fio2 TINYINT, 
-	glucometria SMALLINT, 
-	weight DECIMAL(6, 2), 
-	height DECIMAL(5, 1), 
-	pain_scale_eva TINYINT, 
-	glasgow_ocular TINYINT, 
-	glasgow_verbal TINYINT, 
-	glasgow_motor TINYINT, 
-	glasgow_total TINYINT, 
-	perimetro_cefalico DECIMAL(4, 1), 
-	flacc TINYINT, 
-	recorded_by BINARY(16), 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE SET NULL, 
-	FOREIGN KEY(recorded_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS imaging_attachments (
-	id BINARY(16) NOT NULL, 
-	imaging_study_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	file_url VARCHAR(500) NOT NULL, 
-	file_type VARCHAR(100), 
-	description VARCHAR(255), 
-	uploaded_by BINARY(16), 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(imaging_study_id) REFERENCES imaging_studies (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(uploaded_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS imaging_reports (
-	id BINARY(16) NOT NULL, 
-	imaging_study_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	radiologist_id BINARY(16), 
-	radiologist_name VARCHAR(255), 
-	findings TEXT, 
-	impression TEXT, 
-	recommendations TEXT, 
-	signed_at DATETIME, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(imaging_study_id) REFERENCES imaging_studies (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(radiologist_id) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS lab_order_items (
-	id BINARY(16) NOT NULL, 
-	lab_order_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	lab_test_id BINARY(16), 
-	test_code VARCHAR(20), 
-	test_name VARCHAR(255) NOT NULL, 
-	specimen_type VARCHAR(100), 
-	status ENUM('ordered','collected','processing','completed','cancelled') NOT NULL, 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(lab_order_id) REFERENCES lab_orders (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(lab_test_id) REFERENCES lab_tests_catalog (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS lab_specimens (
-	id BINARY(16) NOT NULL, 
-	lab_order_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	specimen_type VARCHAR(100) NOT NULL, 
-	barcode VARCHAR(100), 
-	collected_by BINARY(16), 
-	collected_at DATETIME, 
-	received_at DATETIME, 
-	rejection_reason TEXT, 
-	status ENUM('pending','collected','rejected','received') NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(lab_order_id) REFERENCES lab_orders (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(collected_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS prescription_items (
-	id BINARY(16) NOT NULL, 
-	prescription_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	medication_name VARCHAR(255) NOT NULL, 
-	medication_code VARCHAR(50), 
-	concentration VARCHAR(100), 
-	pharmaceutical_form VARCHAR(100), 
-	dose VARCHAR(100), 
-	frequency VARCHAR(100), 
-	duration VARCHAR(100), 
-	route VARCHAR(100), 
-	quantity DECIMAL(10, 2), 
-	refills SMALLINT NOT NULL, 
-	start_date DATE, 
-	end_date DATE, 
-	indication VARCHAR(255), 
-	instructions TEXT, 
-	status ENUM('active','suspended','completed','substituted') NOT NULL, 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(prescription_id) REFERENCES prescriptions (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS public_access_tokens (
-	id BINARY(16) NOT NULL, 
-	referral_id BINARY(16), 
-	patient_id BINARY(16) NOT NULL, 
-	clinical_record_id BINARY(16) NOT NULL, 
-	token VARCHAR(255) NOT NULL, 
-	expires_at DATETIME NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(referral_id) REFERENCES referrals (id) ON DELETE CASCADE, 
-	FOREIGN KEY(patient_id) REFERENCES patients (id) ON DELETE CASCADE, 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE CASCADE, 
-	UNIQUE (token)
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS record_diagnoses (
-	id BINARY(16) NOT NULL, 
-	clinical_record_id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	clinical_problem_id BINARY(16), 
-	cie10_code VARCHAR(10) NOT NULL, 
-	cie10_description VARCHAR(255) NOT NULL, 
-	diagnosis_type ENUM('presumptive','definitive','ruled_out') NOT NULL, 
-	is_first_time BOOL NOT NULL, 
-	is_primary_diagnosis BOOL NOT NULL, 
-	is_background BOOL NOT NULL, 
-	is_outpatient BOOL NOT NULL, 
-	notes TEXT, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(clinical_record_id) REFERENCES clinical_records (id) ON DELETE CASCADE, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(clinical_problem_id) REFERENCES clinical_problems (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS lab_results (
-	id BINARY(16) NOT NULL, 
-	lab_order_id BINARY(16) NOT NULL, 
-	lab_order_item_id BINARY(16), 
-	tenant_id VARCHAR(50) NOT NULL, 
-	analyte_name VARCHAR(255), 
-	result_value VARCHAR(255), 
-	numeric_value DECIMAL(12, 4), 
-	unit VARCHAR(50), 
-	reference_range VARCHAR(255), 
-	is_abnormal BOOL, 
-	abnormal_flag VARCHAR(20), 
-	pdf_url VARCHAR(500), 
-	resulted_at DATETIME, 
-	verified_by BINARY(16), 
-	verified_at DATETIME, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(lab_order_id) REFERENCES lab_orders (id) ON DELETE RESTRICT, 
-	FOREIGN KEY(lab_order_item_id) REFERENCES lab_order_items (id) ON DELETE SET NULL, 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(verified_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
-
-CREATE TABLE IF NOT EXISTS medication_inventory_movements (
-	id BINARY(16) NOT NULL, 
-	tenant_id VARCHAR(50) NOT NULL, 
-	inventory_id BINARY(16) NOT NULL, 
-	prescription_item_id BINARY(16), 
-	movement_type ENUM('purchase','dispensing','adjustment','transfer','return_in','waste') NOT NULL, 
-	quantity DECIMAL(12, 2) NOT NULL, 
-	reference VARCHAR(255), 
-	notes TEXT, 
-	created_by BINARY(16), 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	PRIMARY KEY (id), 
-	FOREIGN KEY(tenant_id) REFERENCES tenants (id), 
-	FOREIGN KEY(inventory_id) REFERENCES medication_inventory (id) ON DELETE CASCADE, 
-	FOREIGN KEY(prescription_item_id) REFERENCES prescription_items (id) ON DELETE SET NULL, 
-	FOREIGN KEY(created_by) REFERENCES users (id) ON DELETE SET NULL
-)
-
-;
-
+-- Regenerated from salvio_tenant_template (live schema) to fix drift vs. the previous static file.
+SET FOREIGN_KEY_CHECKS=0;
+
+CREATE TABLE IF NOT EXISTS `audit_log` (
+  `id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `user_id` binary(16) DEFAULT NULL,
+  `action` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `table_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `record_id` binary(16) DEFAULT NULL,
+  `old_values` json DEFAULT NULL,
+  `new_values` json DEFAULT NULL,
+  `ip_address` varchar(45) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `user_agent` text COLLATE utf8mb4_unicode_ci,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `clinical_systems_catalog` (
+  `id` binary(16) NOT NULL,
+  `system_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `applies_to` set('exam','review') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sort_order` tinyint NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `system_name` (`system_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `development_milestones_config` (
+  `id` binary(16) NOT NULL,
+  `milestone_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `category` enum('motor_gross','motor_fine','communication_language','cognitive','social_emotional') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `age_median_months` decimal(5,1) NOT NULL,
+  `alert_age_months` decimal(5,1) NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lab_tests_catalog` (
+  `id` binary(16) NOT NULL,
+  `test_code` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `test_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `category` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `unit` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ref_range` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `test_code` (`test_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `tenants` (
+  `id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `country` varchar(2) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_active` tinyint(1) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `facilities` (
+  `id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `facility_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `phone` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `address` text COLLATE utf8mb4_unicode_ci,
+  `is_active` tinyint(1) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `facilities_ibfk_1` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `hc_templates` (
+  `id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `specialty` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `require_insurance_affiliation` tinyint(1) NOT NULL,
+  `require_labor_data` tinyint(1) NOT NULL,
+  `require_attention_number` tinyint(1) NOT NULL,
+  `show_glasgow_scale` tinyint(1) NOT NULL,
+  `show_triage` tinyint(1) NOT NULL,
+  `show_pediatric_perinatal` tinyint(1) NOT NULL,
+  `show_clinical_scales` tinyint(1) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `hc_templates_ibfk_1` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `medication_catalog` (
+  `id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `medication_code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `generic_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `brand_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `concentration` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `pharmaceutical_form` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `route` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_controlled` tinyint(1) NOT NULL,
+  `is_active` tinyint(1) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `medication_catalog_ibfk_1` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patients` (
+  `id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `medical_record_number` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `first_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `last_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `date_of_birth` date NOT NULL,
+  `gender` enum('male','female','other') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `dui` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `nit` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `phone` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `address` text COLLATE utf8mb4_unicode_ci,
+  `emergency_contact_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `emergency_contact_phone` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `emergency_contact_relationship` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `insurance_type` enum('particular','ss_pensionado','ss_cotizante','ss_beneficiario','red_publica','privado','ninguno','otro') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `insurance_number` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `attention_number` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `last_employer` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `work_phone` varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `last_occupation` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `last_contribution_period` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `last_work_date` date DEFAULT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `patients_ibfk_1` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `users` (
+  `id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `hashed_password` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `full_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `role` enum('super_admin','clinic_admin','doctor','resident','nurse','receptionist','accountant','patient') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `specialty` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL,
+  `deleted_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `users_ibfk_1` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `appointments` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `doctor_id` binary(16) NOT NULL,
+  `scheduled_at` datetime NOT NULL,
+  `appointment_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('scheduled','confirmed','checked_in','in_consultation','completed','cancelled','no_show','rescheduled') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `deleted_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `doctor_id` (`doctor_id`),
+  CONSTRAINT `appointments_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `appointments_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `appointments_ibfk_3` FOREIGN KEY (`doctor_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `departments` (
+  `id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `facility_id` binary(16) DEFAULT NULL,
+  `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `specialty` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_clinical` tinyint(1) NOT NULL,
+  `is_active` tinyint(1) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `facility_id` (`facility_id`),
+  CONSTRAINT `departments_ibfk_1` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `departments_ibfk_2` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `medication_inventory` (
+  `id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `medication_id` binary(16) NOT NULL,
+  `facility_id` binary(16) DEFAULT NULL,
+  `lot_number` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `expiration_date` date DEFAULT NULL,
+  `quantity_on_hand` decimal(12,2) NOT NULL,
+  `minimum_stock` decimal(12,2) NOT NULL,
+  `unit` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `medication_id` (`medication_id`),
+  KEY `facility_id` (`facility_id`),
+  CONSTRAINT `medication_inventory_ibfk_1` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `medication_inventory_ibfk_2` FOREIGN KEY (`medication_id`) REFERENCES `medication_catalog` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `medication_inventory_ibfk_3` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `otp_tokens_sms` (
+  `id` binary(16) NOT NULL,
+  `user_id` binary(16) NOT NULL,
+  `phone_number` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `otp_code_hash` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used` tinyint(1) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `otp_tokens_sms_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_admissions` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `admission_datetime` datetime NOT NULL,
+  `discharge_datetime` datetime DEFAULT NULL,
+  `service` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `bed_number` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `admitting_doctor` binary(16) DEFAULT NULL,
+  `admitting_doctor_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `diagnosis_on_admission` text COLLATE utf8mb4_unicode_ci,
+  `discharge_diagnosis_cie10` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('active','discharged','transferred') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `admitting_doctor` (`admitting_doctor`),
+  CONSTRAINT `patient_admissions_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_admissions_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `patient_admissions_ibfk_3` FOREIGN KEY (`admitting_doctor`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_allergies` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `allergen` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reaction` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `severity` enum('mild','moderate','severe','life_threatening') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `is_active` tinyint(1) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `patient_allergies_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_allergies_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_chronic_diseases` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `disease_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `cie10_code` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `diagnosis_date` date DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `patient_chronic_diseases_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_chronic_diseases_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_consents` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `consent_type` enum('treatment','surgery','anesthesia','data','whatsapp') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `consent_text` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `signed_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `signed_by` binary(16) DEFAULT NULL,
+  `pdf_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `revoked_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `signed_by` (`signed_by`),
+  CONSTRAINT `patient_consents_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_consents_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `patient_consents_ibfk_3` FOREIGN KEY (`signed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_development_hx` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `walking_age_months` decimal(5,1) DEFAULT NULL,
+  `first_words_age_months` decimal(5,1) DEFAULT NULL,
+  `toilet_training_age_months` decimal(5,1) DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `patient_development_hx_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_development_hx_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_development_records` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `milestone_id` binary(16) NOT NULL,
+  `achieved_at` date DEFAULT NULL,
+  `delay_alert` tinyint(1) NOT NULL,
+  `recorded_by` binary(16) DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `milestone_id` (`milestone_id`),
+  KEY `recorded_by` (`recorded_by`),
+  CONSTRAINT `patient_development_records_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_development_records_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `patient_development_records_ibfk_3` FOREIGN KEY (`milestone_id`) REFERENCES `development_milestones_config` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `patient_development_records_ibfk_4` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_family_hx` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `relationship` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `condition_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `cie10_code` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `patient_family_hx_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_family_hx_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_gynecological_hx` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `menarche_age` tinyint DEFAULT NULL,
+  `last_menstrual_period` date DEFAULT NULL,
+  `pregnancies` tinyint DEFAULT NULL,
+  `deliveries` tinyint DEFAULT NULL,
+  `abortions` tinyint DEFAULT NULL,
+  `contraceptive_method` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `patient_gynecological_hx_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_gynecological_hx_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_hospitalizations_hx` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `admission_date` date NOT NULL,
+  `discharge_date` date DEFAULT NULL,
+  `reason` text COLLATE utf8mb4_unicode_ci,
+  `hospital` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `patient_hospitalizations_hx_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_hospitalizations_hx_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_immunizations` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `vaccine_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `dose_number` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `lot_number` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `applied_at` date DEFAULT NULL,
+  `next_due_at` date DEFAULT NULL,
+  `applied_by` binary(16) DEFAULT NULL,
+  `status` enum('applied','pending','refused','contraindicated') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `applied_by` (`applied_by`),
+  CONSTRAINT `patient_immunizations_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_immunizations_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `patient_immunizations_ibfk_3` FOREIGN KEY (`applied_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_medications` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `medication_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `dose` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `frequency` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `start_date` date DEFAULT NULL,
+  `end_date` date DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL,
+  `prescribed_by` binary(16) DEFAULT NULL,
+  `prescribed_by_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `prescribed_by` (`prescribed_by`),
+  CONSTRAINT `patient_medications_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_medications_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `patient_medications_ibfk_3` FOREIGN KEY (`prescribed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_perinatal_hx` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `gestational_weeks` tinyint DEFAULT NULL,
+  `prenatal_controls` tinyint DEFAULT NULL,
+  `delivery_route` enum('vaginal','cesarean','forceps') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `birth_weight` decimal(6,2) DEFAULT NULL,
+  `birth_length` decimal(5,1) DEFAULT NULL,
+  `head_circumference` decimal(5,1) DEFAULT NULL,
+  `apgar_1min` tinyint DEFAULT NULL,
+  `apgar_5min` tinyint DEFAULT NULL,
+  `apgar_10min` tinyint DEFAULT NULL,
+  `ballard_weeks` tinyint DEFAULT NULL,
+  `silverman_retractions` tinyint DEFAULT NULL,
+  `silverman_cyanosis` tinyint DEFAULT NULL,
+  `silverman_grunting` tinyint DEFAULT NULL,
+  `silverman_breathing` tinyint DEFAULT NULL,
+  `silverman_auscultation` tinyint DEFAULT NULL,
+  `silverman_total` tinyint DEFAULT NULL,
+  `nicu_admission` tinyint(1) DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `patient_perinatal_hx_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_perinatal_hx_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_physiological_hx` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `blood_type` varchar(5) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `rh_factor` enum('positive','negative','unknown') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `smoking` enum('never','former','current') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `alcohol` enum('never','occasional','daily') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `drugs` text COLLATE utf8mb4_unicode_ci,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `patient_physiological_hx_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_physiological_hx_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_social_hx` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `occupation` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `living_conditions` text COLLATE utf8mb4_unicode_ci,
+  `housing_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `has_water` tinyint(1) DEFAULT NULL,
+  `has_sewer` tinyint(1) DEFAULT NULL,
+  `has_electricity` tinyint(1) DEFAULT NULL,
+  `pets` text COLLATE utf8mb4_unicode_ci,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `patient_social_hx_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_social_hx_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_surgeries` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `surgery_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `surgery_date` date DEFAULT NULL,
+  `hospital` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `patient_surgeries_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_surgeries_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `revoked_tokens` (
+  `id` binary(16) NOT NULL,
+  `jti` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `user_id` binary(16) NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `jti` (`jti`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `revoked_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `billing` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `appointment_id` binary(16) DEFAULT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `currency` varchar(3) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` enum('pending','paid','void','refunded') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `payment_method` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `payment_date` datetime DEFAULT NULL,
+  `due_date` datetime DEFAULT NULL,
+  `invoice_number` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `void_reason` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `appointment_id` (`appointment_id`),
+  CONSTRAINT `billing_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `billing_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `billing_ibfk_3` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `clinical_records` (
+  `id` binary(16) NOT NULL,
+  `appointment_id` binary(16) DEFAULT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `doctor_id` binary(16) NOT NULL,
+  `doctor_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` enum('draft','signed') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `soap_subjective` text COLLATE utf8mb4_unicode_ci,
+  `soap_objective` text COLLATE utf8mb4_unicode_ci,
+  `soap_assessment` text COLLATE utf8mb4_unicode_ci,
+  `soap_plan` text COLLATE utf8mb4_unicode_ci,
+  `informant` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `informant_relationship` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `visit_number` smallint DEFAULT NULL,
+  `printed_at` datetime DEFAULT NULL,
+  `signed_at` datetime DEFAULT NULL,
+  `digital_signature` text COLLATE utf8mb4_unicode_ci,
+  `deleted_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `appointment_id` (`appointment_id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `doctor_id` (`doctor_id`),
+  CONSTRAINT `clinical_records_ibfk_1` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `clinical_records_ibfk_2` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `clinical_records_ibfk_3` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `clinical_records_ibfk_4` FOREIGN KEY (`doctor_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `encounters` (
+  `id` binary(16) NOT NULL,
+  `appointment_id` binary(16) DEFAULT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `doctor_id` binary(16) NOT NULL,
+  `status` enum('active','completed','closed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `chief_complaint` text COLLATE utf8mb4_unicode_ci,
+  `started_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `completed_at` datetime DEFAULT NULL,
+  `closed_at` datetime DEFAULT NULL,
+  `created_by` binary(16) DEFAULT NULL,
+  `updated_by` binary(16) DEFAULT NULL,
+  `version` int NOT NULL DEFAULT '1',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `fk_encounters_doctor` (`doctor_id`),
+  KEY `idx_encounter_tenant` (`tenant_id`),
+  KEY `idx_encounter_patient` (`patient_id`),
+  KEY `idx_encounter_appointment` (`appointment_id`),
+  KEY `idx_encounter_doctor_status` (`tenant_id`,`doctor_id`,`status`),
+  CONSTRAINT `fk_encounters_appointment` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_encounters_doctor` FOREIGN KEY (`doctor_id`) REFERENCES `users` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_encounters_patient` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_encounters_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `rooms` (
+  `id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `facility_id` binary(16) DEFAULT NULL,
+  `department_id` binary(16) DEFAULT NULL,
+  `room_number` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `room_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `floor` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `facility_id` (`facility_id`),
+  KEY `department_id` (`department_id`),
+  CONSTRAINT `rooms_ibfk_1` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `rooms_ibfk_2` FOREIGN KEY (`facility_id`) REFERENCES `facilities` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `rooms_ibfk_3` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `triage_records` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `appointment_id` binary(16) DEFAULT NULL,
+  `admission_id` binary(16) DEFAULT NULL,
+  `received_at` datetime NOT NULL,
+  `triage_at` datetime DEFAULT NULL,
+  `nursing_prep_at` datetime DEFAULT NULL,
+  `priority` enum('low','moderate','high','critical') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `area` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `systolic_bp` smallint DEFAULT NULL,
+  `diastolic_bp` smallint DEFAULT NULL,
+  `heart_rate` smallint DEFAULT NULL,
+  `resp_rate` tinyint DEFAULT NULL,
+  `temperature` decimal(4,1) DEFAULT NULL,
+  `spo2` tinyint DEFAULT NULL,
+  `glasgow_total` tinyint DEFAULT NULL,
+  `chief_complaint` text COLLATE utf8mb4_unicode_ci,
+  `created_by` binary(16) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `appointment_id` (`appointment_id`),
+  KEY `admission_id` (`admission_id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `triage_records_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `triage_records_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `triage_records_ibfk_3` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `triage_records_ibfk_4` FOREIGN KEY (`admission_id`) REFERENCES `patient_admissions` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `triage_records_ibfk_5` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `wa_messages` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `appointment_id` binary(16) DEFAULT NULL,
+  `message_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `template_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('pending','sent','failed','delivered','read') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `error_message` text COLLATE utf8mb4_unicode_ci,
+  `sent_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `appointment_id` (`appointment_id`),
+  CONSTRAINT `wa_messages_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `wa_messages_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `wa_messages_ibfk_3` FOREIGN KEY (`appointment_id`) REFERENCES `appointments` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `beds` (
+  `id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `room_id` binary(16) DEFAULT NULL,
+  `bed_number` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` enum('available','occupied','cleaning','maintenance','blocked') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `current_admission_id` binary(16) DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `room_id` (`room_id`),
+  KEY `current_admission_id` (`current_admission_id`),
+  CONSTRAINT `beds_ibfk_1` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `beds_ibfk_2` FOREIGN KEY (`room_id`) REFERENCES `rooms` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `beds_ibfk_3` FOREIGN KEY (`current_admission_id`) REFERENCES `patient_admissions` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `billing_items` (
+  `id` binary(16) NOT NULL,
+  `billing_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `item_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `quantity` decimal(10,2) NOT NULL,
+  `unit_price` decimal(10,2) NOT NULL,
+  `discount_amount` decimal(10,2) NOT NULL,
+  `tax_amount` decimal(10,2) NOT NULL,
+  `total_amount` decimal(10,2) NOT NULL,
+  `service_date` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `billing_id` (`billing_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `billing_items_ibfk_1` FOREIGN KEY (`billing_id`) REFERENCES `billing` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `billing_items_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `clinical_notes` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `admission_id` binary(16) DEFAULT NULL,
+  `encounter_id` binary(16) DEFAULT NULL,
+  `clinical_record_id` binary(16) DEFAULT NULL,
+  `note_type` enum('progress','nursing','discharge','other') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `content` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `authored_by` binary(16) DEFAULT NULL,
+  `authored_by_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `updated_by` binary(16) DEFAULT NULL,
+  `is_closed` tinyint(1) NOT NULL DEFAULT '0',
+  `closed_at` datetime DEFAULT NULL,
+  `version` int NOT NULL DEFAULT '1',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `admission_id` (`admission_id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `authored_by` (`authored_by`),
+  KEY `idx_notes_encounter` (`encounter_id`),
+  CONSTRAINT `clinical_notes_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `clinical_notes_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `clinical_notes_ibfk_3` FOREIGN KEY (`admission_id`) REFERENCES `patient_admissions` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `clinical_notes_ibfk_4` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `clinical_notes_ibfk_5` FOREIGN KEY (`authored_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `clinical_orders` (
+  `id` binary(16) NOT NULL,
+  `encounter_id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `ordered_by` binary(16) NOT NULL,
+  `order_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` enum('active','completed','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `scheduled_for` datetime DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_by` binary(16) DEFAULT NULL,
+  `updated_by` binary(16) DEFAULT NULL,
+  `version` int NOT NULL DEFAULT '1',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `fk_orders_patient` (`patient_id`),
+  KEY `fk_orders_doctor` (`ordered_by`),
+  KEY `idx_clinical_orders_tenant` (`tenant_id`),
+  KEY `idx_clinical_orders_encounter` (`encounter_id`),
+  KEY `idx_clinical_orders_status` (`tenant_id`,`status`),
+  CONSTRAINT `fk_orders_doctor` FOREIGN KEY (`ordered_by`) REFERENCES `users` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `fk_orders_encounter` FOREIGN KEY (`encounter_id`) REFERENCES `encounters` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_orders_patient` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_orders_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `clinical_problems` (
+  `id` binary(16) NOT NULL,
+  `clinical_record_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `problem_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_active` tinyint(1) NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `clinical_problems_ibfk_1` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `clinical_problems_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `clinical_procedures` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `clinical_record_id` binary(16) DEFAULT NULL,
+  `consent_id` binary(16) DEFAULT NULL,
+  `procedure_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `performed_by` binary(16) DEFAULT NULL,
+  `performed_by_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `performed_at` datetime DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `consent_id` (`consent_id`),
+  KEY `performed_by` (`performed_by`),
+  CONSTRAINT `clinical_procedures_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `clinical_procedures_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `clinical_procedures_ibfk_3` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `clinical_procedures_ibfk_4` FOREIGN KEY (`consent_id`) REFERENCES `patient_consents` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `clinical_procedures_ibfk_5` FOREIGN KEY (`performed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `clinical_scale_results` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `clinical_record_id` binary(16) DEFAULT NULL,
+  `scale_name` enum('barthel','braden','morse','asa','silverman','flacc','eva') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `total_score` smallint DEFAULT NULL,
+  `risk_level` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `details` json DEFAULT NULL,
+  `performed_by` binary(16) DEFAULT NULL,
+  `performed_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `performed_by` (`performed_by`),
+  CONSTRAINT `clinical_scale_results_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `clinical_scale_results_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `clinical_scale_results_ibfk_3` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `clinical_scale_results_ibfk_4` FOREIGN KEY (`performed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `imaging_studies` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `clinical_record_id` binary(16) DEFAULT NULL,
+  `study_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `body_part` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ordered_by` binary(16) DEFAULT NULL,
+  `order_datetime` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `performed_at` datetime DEFAULT NULL,
+  `result_summary` text COLLATE utf8mb4_unicode_ci,
+  `pdf_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `dicom_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('ordered','performed','reviewed','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `ordered_by` (`ordered_by`),
+  CONSTRAINT `imaging_studies_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `imaging_studies_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `imaging_studies_ibfk_3` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `imaging_studies_ibfk_4` FOREIGN KEY (`ordered_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `interconsults` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `clinical_record_id` binary(16) DEFAULT NULL,
+  `requesting_doctor` binary(16) NOT NULL,
+  `requesting_doctor_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `consulting_specialty` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reason` text COLLATE utf8mb4_unicode_ci,
+  `requested_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `response` text COLLATE utf8mb4_unicode_ci,
+  `responded_at` datetime DEFAULT NULL,
+  `status` enum('pending','accepted','completed','rejected') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `requesting_doctor` (`requesting_doctor`),
+  CONSTRAINT `interconsults_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `interconsults_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `interconsults_ibfk_3` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `interconsults_ibfk_4` FOREIGN KEY (`requesting_doctor`) REFERENCES `users` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lab_orders` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `clinical_record_id` binary(16) DEFAULT NULL,
+  `ordered_by` binary(16) NOT NULL,
+  `lab_test_id` binary(16) DEFAULT NULL,
+  `test_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `order_datetime` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `status` enum('ordered','collected','processing','completed','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `ordered_by` (`ordered_by`),
+  KEY `lab_test_id` (`lab_test_id`),
+  CONSTRAINT `lab_orders_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `lab_orders_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `lab_orders_ibfk_3` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `lab_orders_ibfk_4` FOREIGN KEY (`ordered_by`) REFERENCES `users` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `lab_orders_ibfk_5` FOREIGN KEY (`lab_test_id`) REFERENCES `lab_tests_catalog` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_documents` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `clinical_record_id` binary(16) DEFAULT NULL,
+  `category` enum('identity','consent','clinical','lab','imaging','billing','referral','other') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_url` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `mime_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `checksum` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `uploaded_by` binary(16) DEFAULT NULL,
+  `is_confidential` tinyint(1) NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `deleted_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `uploaded_by` (`uploaded_by`),
+  CONSTRAINT `patient_documents_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_documents_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `patient_documents_ibfk_3` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `patient_documents_ibfk_4` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `patient_growth_measurements` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `clinical_record_id` binary(16) DEFAULT NULL,
+  `measured_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `weight` decimal(6,2) DEFAULT NULL,
+  `height` decimal(5,1) DEFAULT NULL,
+  `head_circumference` decimal(5,1) DEFAULT NULL,
+  `bmi` decimal(5,2) DEFAULT NULL,
+  `weight_percentile` decimal(5,2) DEFAULT NULL,
+  `height_percentile` decimal(5,2) DEFAULT NULL,
+  `bmi_percentile` decimal(5,2) DEFAULT NULL,
+  `recorded_by` binary(16) DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `recorded_by` (`recorded_by`),
+  CONSTRAINT `patient_growth_measurements_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `patient_growth_measurements_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `patient_growth_measurements_ibfk_3` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `patient_growth_measurements_ibfk_4` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `payments` (
+  `id` binary(16) NOT NULL,
+  `billing_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `currency` varchar(3) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `payment_method` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reference_number` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('pending','completed','failed','refunded','void') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `paid_at` datetime DEFAULT NULL,
+  `processed_by` binary(16) DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `billing_id` (`billing_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `processed_by` (`processed_by`),
+  CONSTRAINT `payments_ibfk_1` FOREIGN KEY (`billing_id`) REFERENCES `billing` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `payments_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `payments_ibfk_3` FOREIGN KEY (`processed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `physical_exam_findings` (
+  `id` binary(16) NOT NULL,
+  `clinical_record_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `system_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_normal` tinyint(1) DEFAULT NULL,
+  `findings` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `physical_exam_findings_ibfk_1` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `physical_exam_findings_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `prescriptions` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `encounter_id` binary(16) DEFAULT NULL,
+  `clinical_record_id` binary(16) DEFAULT NULL,
+  `prescribed_by` binary(16) NOT NULL,
+  `prescribed_by_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `prescribed_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `pdf_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('pending_override','active','dispensed','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `updated_by` binary(16) DEFAULT NULL,
+  `version` int NOT NULL DEFAULT '1',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `prescribed_by` (`prescribed_by`),
+  KEY `idx_rx_encounter` (`encounter_id`),
+  CONSTRAINT `prescriptions_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `prescriptions_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `prescriptions_ibfk_3` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `prescriptions_ibfk_4` FOREIGN KEY (`prescribed_by`) REFERENCES `users` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `record_plans` (
+  `id` binary(16) NOT NULL,
+  `clinical_record_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `plan_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `description` text COLLATE utf8mb4_unicode_ci,
+  `due_date` date DEFAULT NULL,
+  `completed_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `record_plans_ibfk_1` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `record_plans_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `referrals` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `clinical_record_id` binary(16) DEFAULT NULL,
+  `referral_type` enum('internal','internal_transfer','cross_tenant','public') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `source_service` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `destination_area` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `transfer_reason` text COLLATE utf8mb4_unicode_ci,
+  `referred_by` binary(16) DEFAULT NULL,
+  `referred_by_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `target_tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('pending','accepted','completed','rejected') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `referred_by` (`referred_by`),
+  CONSTRAINT `referrals_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `referrals_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `referrals_ibfk_3` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `referrals_ibfk_4` FOREIGN KEY (`referred_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `review_of_systems` (
+  `id` binary(16) NOT NULL,
+  `clinical_record_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `system_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_positive` tinyint(1) DEFAULT NULL,
+  `comments` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `review_of_systems_ibfk_1` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `review_of_systems_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `vital_signs` (
+  `id` binary(16) NOT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `encounter_id` binary(16) DEFAULT NULL,
+  `clinical_record_id` binary(16) DEFAULT NULL,
+  `recorded_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `bp_systolic` smallint DEFAULT NULL,
+  `bp_diastolic` smallint DEFAULT NULL,
+  `heart_rate` smallint DEFAULT NULL,
+  `resp_rate` tinyint DEFAULT NULL,
+  `temperature` decimal(4,1) DEFAULT NULL,
+  `spo2` tinyint DEFAULT NULL,
+  `fio2` tinyint DEFAULT NULL,
+  `glucometria` smallint DEFAULT NULL,
+  `weight` decimal(6,2) DEFAULT NULL,
+  `height` decimal(5,1) DEFAULT NULL,
+  `pain_scale_eva` tinyint DEFAULT NULL,
+  `glasgow_ocular` tinyint DEFAULT NULL,
+  `glasgow_verbal` tinyint DEFAULT NULL,
+  `glasgow_motor` tinyint DEFAULT NULL,
+  `glasgow_total` tinyint DEFAULT NULL,
+  `perimetro_cefalico` decimal(4,1) DEFAULT NULL,
+  `flacc` tinyint DEFAULT NULL,
+  `recorded_by` binary(16) DEFAULT NULL,
+  `updated_by` binary(16) DEFAULT NULL,
+  `version` int NOT NULL DEFAULT '1',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `recorded_by` (`recorded_by`),
+  KEY `idx_vs_encounter` (`encounter_id`),
+  CONSTRAINT `vital_signs_ibfk_1` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `vital_signs_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `vital_signs_ibfk_3` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `vital_signs_ibfk_4` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `imaging_attachments` (
+  `id` binary(16) NOT NULL,
+  `imaging_study_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_url` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `description` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `uploaded_by` binary(16) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `imaging_study_id` (`imaging_study_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `uploaded_by` (`uploaded_by`),
+  CONSTRAINT `imaging_attachments_ibfk_1` FOREIGN KEY (`imaging_study_id`) REFERENCES `imaging_studies` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `imaging_attachments_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `imaging_attachments_ibfk_3` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `imaging_reports` (
+  `id` binary(16) NOT NULL,
+  `imaging_study_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `radiologist_id` binary(16) DEFAULT NULL,
+  `radiologist_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `findings` text COLLATE utf8mb4_unicode_ci,
+  `impression` text COLLATE utf8mb4_unicode_ci,
+  `recommendations` text COLLATE utf8mb4_unicode_ci,
+  `signed_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `imaging_study_id` (`imaging_study_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `radiologist_id` (`radiologist_id`),
+  CONSTRAINT `imaging_reports_ibfk_1` FOREIGN KEY (`imaging_study_id`) REFERENCES `imaging_studies` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `imaging_reports_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `imaging_reports_ibfk_3` FOREIGN KEY (`radiologist_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lab_order_items` (
+  `id` binary(16) NOT NULL,
+  `lab_order_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `lab_test_id` binary(16) DEFAULT NULL,
+  `test_code` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `test_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `specimen_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` enum('ordered','collected','processing','completed','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `lab_order_id` (`lab_order_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `lab_test_id` (`lab_test_id`),
+  CONSTRAINT `lab_order_items_ibfk_1` FOREIGN KEY (`lab_order_id`) REFERENCES `lab_orders` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `lab_order_items_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `lab_order_items_ibfk_3` FOREIGN KEY (`lab_test_id`) REFERENCES `lab_tests_catalog` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lab_specimens` (
+  `id` binary(16) NOT NULL,
+  `lab_order_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `specimen_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `barcode` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `collected_by` binary(16) DEFAULT NULL,
+  `collected_at` datetime DEFAULT NULL,
+  `received_at` datetime DEFAULT NULL,
+  `rejection_reason` text COLLATE utf8mb4_unicode_ci,
+  `status` enum('pending','collected','rejected','received') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `lab_order_id` (`lab_order_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `collected_by` (`collected_by`),
+  CONSTRAINT `lab_specimens_ibfk_1` FOREIGN KEY (`lab_order_id`) REFERENCES `lab_orders` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `lab_specimens_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `lab_specimens_ibfk_3` FOREIGN KEY (`collected_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `prescription_items` (
+  `id` binary(16) NOT NULL,
+  `prescription_id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `medication_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `medication_code` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `concentration` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `pharmaceutical_form` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `dose` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `frequency` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `duration` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `route` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `quantity` decimal(10,2) DEFAULT NULL,
+  `refills` smallint NOT NULL,
+  `start_date` date DEFAULT NULL,
+  `end_date` date DEFAULT NULL,
+  `indication` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `instructions` text COLLATE utf8mb4_unicode_ci,
+  `status` enum('active','suspended','completed','substituted') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `prescription_id` (`prescription_id`),
+  KEY `tenant_id` (`tenant_id`),
+  CONSTRAINT `prescription_items_ibfk_1` FOREIGN KEY (`prescription_id`) REFERENCES `prescriptions` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `prescription_items_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `public_access_tokens` (
+  `id` binary(16) NOT NULL,
+  `referral_id` binary(16) DEFAULT NULL,
+  `patient_id` binary(16) NOT NULL,
+  `clinical_record_id` binary(16) NOT NULL,
+  `token` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `token` (`token`),
+  KEY `referral_id` (`referral_id`),
+  KEY `patient_id` (`patient_id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  CONSTRAINT `public_access_tokens_ibfk_1` FOREIGN KEY (`referral_id`) REFERENCES `referrals` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `public_access_tokens_ibfk_2` FOREIGN KEY (`patient_id`) REFERENCES `patients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `public_access_tokens_ibfk_3` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `record_diagnoses` (
+  `encounter_id` binary(16) DEFAULT NULL,
+  `id` binary(16) NOT NULL,
+  `clinical_record_id` binary(16) DEFAULT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `clinical_problem_id` binary(16) DEFAULT NULL,
+  `cie10_code` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `cie10_description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `diagnosis_type` enum('presumptive','definitive','ruled_out') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `is_first_time` tinyint(1) NOT NULL,
+  `is_primary_diagnosis` tinyint(1) NOT NULL,
+  `is_background` tinyint(1) NOT NULL,
+  `is_outpatient` tinyint(1) NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_by` binary(16) DEFAULT NULL,
+  `updated_by` binary(16) DEFAULT NULL,
+  `version` int NOT NULL DEFAULT '1',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `clinical_record_id` (`clinical_record_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `clinical_problem_id` (`clinical_problem_id`),
+  KEY `idx_diag_encounter` (`encounter_id`),
+  CONSTRAINT `record_diagnoses_ibfk_1` FOREIGN KEY (`clinical_record_id`) REFERENCES `clinical_records` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `record_diagnoses_ibfk_2` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `record_diagnoses_ibfk_3` FOREIGN KEY (`clinical_problem_id`) REFERENCES `clinical_problems` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `lab_results` (
+  `id` binary(16) NOT NULL,
+  `lab_order_id` binary(16) NOT NULL,
+  `lab_order_item_id` binary(16) DEFAULT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `analyte_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `result_value` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `numeric_value` decimal(12,4) DEFAULT NULL,
+  `unit` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `reference_range` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_abnormal` tinyint(1) DEFAULT NULL,
+  `abnormal_flag` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `pdf_url` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `resulted_at` datetime DEFAULT NULL,
+  `verified_by` binary(16) DEFAULT NULL,
+  `verified_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `lab_order_id` (`lab_order_id`),
+  KEY `lab_order_item_id` (`lab_order_item_id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `verified_by` (`verified_by`),
+  CONSTRAINT `lab_results_ibfk_1` FOREIGN KEY (`lab_order_id`) REFERENCES `lab_orders` (`id`) ON DELETE RESTRICT,
+  CONSTRAINT `lab_results_ibfk_2` FOREIGN KEY (`lab_order_item_id`) REFERENCES `lab_order_items` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `lab_results_ibfk_3` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `lab_results_ibfk_4` FOREIGN KEY (`verified_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `medication_inventory_movements` (
+  `id` binary(16) NOT NULL,
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `inventory_id` binary(16) NOT NULL,
+  `prescription_item_id` binary(16) DEFAULT NULL,
+  `movement_type` enum('purchase','dispensing','adjustment','transfer','return_in','waste') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `quantity` decimal(12,2) NOT NULL,
+  `reference` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_by` binary(16) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `tenant_id` (`tenant_id`),
+  KEY `inventory_id` (`inventory_id`),
+  KEY `prescription_item_id` (`prescription_item_id`),
+  KEY `created_by` (`created_by`),
+  CONSTRAINT `medication_inventory_movements_ibfk_1` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`),
+  CONSTRAINT `medication_inventory_movements_ibfk_2` FOREIGN KEY (`inventory_id`) REFERENCES `medication_inventory` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `medication_inventory_movements_ibfk_3` FOREIGN KEY (`prescription_item_id`) REFERENCES `prescription_items` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `medication_inventory_movements_ibfk_4` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET FOREIGN_KEY_CHECKS=1;

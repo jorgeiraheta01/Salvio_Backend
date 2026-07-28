@@ -59,8 +59,9 @@ class ClinicalRecordRead(ClinicalRecordBase, TimestampMixin, SoftDeleteMixin):
 
 
 class VitalSignBase(ORMModel):
-    patient_id: UUID
-    tenant_id: str = Field(max_length=50)
+    patient_id: UUID | None = None
+    tenant_id: str | None = Field(default=None, max_length=50)
+    encounter_id: UUID | None = None
     clinical_record_id: UUID | None = None
     recorded_at: datetime | None = None
     bp_systolic: int | None = Field(default=None, ge=40, le=300, description="mmHg")
@@ -86,6 +87,8 @@ class VitalSignBase(ORMModel):
 
     @model_validator(mode="after")
     def calculate_derived_fields(self):
+        if self.patient_id is None and self.encounter_id is None and self.clinical_record_id is None:
+            raise ValueError("patient_id, encounter_id or clinical_record_id is required.")
         glasgow_parts = [self.glasgow_ocular, self.glasgow_verbal, self.glasgow_motor]
         if all(part is not None for part in glasgow_parts):
             self.glasgow_total = sum(glasgow_parts)  # type: ignore[arg-type]
@@ -128,6 +131,8 @@ class VitalSignUpdate(ORMModel):
 class VitalSignRead(VitalSignBase):
     id: UUID
     created_at: datetime
+    updated_at: datetime | None = None
+    version: int = 1
 
 
 class PhysicalExamFindingBase(StrippedStringMixin, ORMModel):

@@ -5,14 +5,15 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import sessionmaker
 
+from app.database import get_tenant_engine
 from app.dependencies.db import get_db
 from app.models.tenant import RevokedToken, User, UserRole
+from app.utils.password import normalize_password, pwd_context
 
 security = HTTPBearer(auto_error=True)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY") or "salvio-dev-secret-change-me"
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
@@ -26,9 +27,9 @@ def _uuid_bytes(value: str | UUID) -> bytes:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
-        return pwd_context.verify(plain_password, hashed_password)
+        return pwd_context.verify(normalize_password(plain_password), hashed_password)
     except Exception:
-        return plain_password == hashed_password
+        return normalize_password(plain_password) == hashed_password
 
 
 def create_token(user: User, *, token_type: str, expires_delta: timedelta) -> str:
@@ -75,11 +76,17 @@ def get_current_user(
     if not user_id or not tenant_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
 
-    user = (
-        db.query(User)
-        .filter(User.id == _uuid_bytes(user_id), User.tenant_id == tenant_id, User.deleted_at.is_(None))
-        .first()
-    )
+    tenant_session_factory = sessionmaker(autocommit=False, autoflush=False, bind=get_tenant_engine(tenant_id))
+    tenant_db: Session = tenant_session_factory()
+    try:
+        user = (
+            tenant_db.query(User)
+            .filter(User.id == _uuid_bytes(user_id), User.tenant_id == tenant_id, User.deleted_at.is_(None))
+            .first()
+        )
+    finally:
+        tenant_db.close()
+
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
     return user

@@ -71,6 +71,16 @@ class LogoutRequest(ORMModel):
     refresh_token: str = Field(min_length=20)
 
 
+class PasswordResetRequest(ORMModel):
+    tenant_id: str = Field(min_length=1, max_length=50, pattern=r"^[a-z0-9_]+$")
+    email: str = Field(max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class PasswordResetConfirm(ORMModel):
+    reset_token: str = Field(min_length=20)
+    new_password: SecretStr = Field(min_length=8, max_length=128)
+
+
 class OtpTokenSmsCreate(ORMModel):
     user_id: UUID
     phone_number: str = Field(min_length=8, max_length=30)

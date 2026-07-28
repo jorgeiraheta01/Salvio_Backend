@@ -38,7 +38,9 @@ def update_clinical_record(db: Session, record_id: bytes, tenant_id: str, data: 
     if record.status == ClinicalRecordStatus.signed:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Clinical record is immutable once signed (RN-21)")
     old = model_to_dict(record)
-    for key, value in data_for_model(data, ClinicalRecord).items():
+    update_payload = data_for_model(data, ClinicalRecord)
+    update_payload.pop("id", None)  # data_for_model auto-generates an id for create paths; never apply it on update
+    for key, value in update_payload.items():
         setattr(record, key, value)
     audit(db, user_id=user_id, tenant_id=tenant_id, action="UPDATE", table_name="clinical_records", record_id=record.id, old_values=old, new_values=model_to_dict(record))
     commit_or_409(db)

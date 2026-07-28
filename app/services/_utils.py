@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Any
@@ -40,7 +40,7 @@ def model_to_dict(obj: Any) -> dict[str, Any]:
         value = getattr(obj, column.name)
         if isinstance(value, (bytes, bytearray)) and len(value) == 16:
             data[column.name] = str(UUID(bytes=bytes(value)))
-        elif isinstance(value, datetime):
+        elif isinstance(value, (datetime, date)):
             data[column.name] = value.isoformat()
         elif isinstance(value, Decimal):
             data[column.name] = str(value)
@@ -61,7 +61,13 @@ def data_for_model(data: Any, model: Any, *, exclude: set[str] | None = None, te
     for key, value in payload.items():
         if key not in columns:
             continue
-        if key != "tenant_id" and (key.endswith("_id") or key in {"id", "user_id", "record_id", "signed_by", "recorded_by", "created_by"}):
+        # UUID-typed fields must become raw bytes for BINARY(16) columns regardless of
+        # the field's name — a name-based whitelist (endswith("_id") / hardcoded set)
+        # missed columns like ordered_by/performed_by/uploaded_by/prescribed_by/etc,
+        # leaving them as UUID objects that fail at INSERT time.
+        if isinstance(value, UUID):
+            result[key] = uuid_bytes(value)
+        elif key != "tenant_id" and (key.endswith("_id") or key in {"id", "user_id", "record_id", "signed_by", "recorded_by", "created_by"}):
             result[key] = uuid_bytes(value)
         else:
             result[key] = value

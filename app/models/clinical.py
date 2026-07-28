@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Date, Enum as SQLEnum, ForeignKey, Text, SmallInteger, DECIMAL, Index, JSON
+from sqlalchemy import Column, String, Boolean, DateTime, Date, Enum as SQLEnum, ForeignKey, Text, SmallInteger, DECIMAL, Index, JSON, Integer
 from sqlalchemy.dialects.mysql import BINARY, TINYINT
 from sqlalchemy.sql import func
 from app.database import Base
@@ -75,6 +75,7 @@ class VitalSign(Base):
     id = Column(BINARY(16), primary_key=True, server_default="UUID_TO_BIN(UUID())")
     patient_id = Column(BINARY(16), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False)
     tenant_id = Column(String(50), ForeignKey("tenants.id"), nullable=False)
+    encounter_id = Column(BINARY(16), ForeignKey("encounters.id", ondelete="SET NULL"), nullable=True)
     clinical_record_id = Column(BINARY(16), ForeignKey("clinical_records.id", ondelete="SET NULL"), nullable=True)
     recorded_at = Column(DateTime, nullable=False, server_default=func.now())
     bp_systolic = Column(SmallInteger, nullable=True)
@@ -95,11 +96,15 @@ class VitalSign(Base):
     perimetro_cefalico = Column(DECIMAL(4,1), nullable=True)
     flacc = Column(TINYINT, nullable=True)
     recorded_by = Column(BINARY(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_by = Column(BINARY(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    version = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
         Index("idx_vs_patient", "patient_id", "recorded_at"),
         Index("idx_vs_tenant", "tenant_id"),
+        Index("idx_vs_encounter", "encounter_id"),
         Index("idx_vs_record", "clinical_record_id"),
         Index("idx_vs_glasgow", "patient_id", "glasgow_total", "recorded_at"),
     )
@@ -165,7 +170,8 @@ class ClinicalProblem(Base):
 class RecordDiagnosis(Base):
     __tablename__ = "record_diagnoses"
     id = Column(BINARY(16), primary_key=True, server_default="UUID_TO_BIN(UUID())")
-    clinical_record_id = Column(BINARY(16), ForeignKey("clinical_records.id", ondelete="CASCADE"), nullable=False)
+    encounter_id = Column(BINARY(16), ForeignKey("encounters.id", ondelete="SET NULL"), nullable=True)
+    clinical_record_id = Column(BINARY(16), ForeignKey("clinical_records.id", ondelete="CASCADE"), nullable=True)
     tenant_id = Column(String(50), ForeignKey("tenants.id"), nullable=False)
     clinical_problem_id = Column(BINARY(16), ForeignKey("clinical_problems.id", ondelete="SET NULL"), nullable=True)
     cie10_code = Column(String(10), nullable=False)
@@ -176,9 +182,14 @@ class RecordDiagnosis(Base):
     is_background = Column(Boolean, nullable=False)
     is_outpatient = Column(Boolean, nullable=False)
     notes = Column(Text, nullable=True)
+    created_by = Column(BINARY(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_by = Column(BINARY(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    version = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
+        Index("idx_diag_encounter", "encounter_id"),
         Index("idx_diag_record", "clinical_record_id"),
         Index("idx_diag_tenant", "tenant_id"),
         Index("idx_diag_primary", "clinical_record_id", "is_primary_diagnosis"),
@@ -213,14 +224,21 @@ class ClinicalNote(Base):
     patient_id = Column(BINARY(16), ForeignKey("patients.id", ondelete="CASCADE"), nullable=False)
     tenant_id = Column(String(50), ForeignKey("tenants.id"), nullable=False)
     admission_id = Column(BINARY(16), ForeignKey("patient_admissions.id", ondelete="SET NULL"), nullable=True)
+    encounter_id = Column(BINARY(16), ForeignKey("encounters.id", ondelete="SET NULL"), nullable=True)
     clinical_record_id = Column(BINARY(16), ForeignKey("clinical_records.id", ondelete="SET NULL"), nullable=True)
     note_type = Column(SQLEnum(NoteType), nullable=False)
     content = Column(Text, nullable=False)
     authored_by = Column(BINARY(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     authored_by_name = Column(String(255), nullable=True)
+    updated_by = Column(BINARY(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    is_closed = Column(Boolean, nullable=False, default=False)
+    closed_at = Column(DateTime, nullable=True)
+    version = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     __table_args__ = (
+        Index("idx_notes_encounter", "encounter_id"),
         Index("idx_notes_patient", "patient_id"),
         Index("idx_notes_tenant", "tenant_id"),
         Index("idx_notes_admission", "admission_id"),
