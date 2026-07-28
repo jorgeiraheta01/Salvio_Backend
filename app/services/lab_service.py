@@ -1,10 +1,21 @@
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models.lab import LabOrder, LabOrderItem, LabResult
+from app.models.lab import LabOrder, LabOrderItem, LabOrderStatus, LabResult
 from app.models.patient import Patient
 from app.schemas.common import ClinicalAlert
-from app.schemas.lab import LabOrderCreate, LabResultCreate
+from app.schemas.lab import LabOrderCreate, LabOrderUpdate, LabResultCreate
 from app.services._utils import audit, commit_or_409, data_for_model, model_to_dict, new_uuid_bytes, not_found
+
+# H-04: orden de laboratorio nunca retrocede -- de cualquier estado no
+# terminal se puede cancelar, pero no "reabrir" uno ya completado/cancelado.
+LAB_ALLOWED_TRANSITIONS = {
+    LabOrderStatus.ordered: {LabOrderStatus.collected, LabOrderStatus.cancelled},
+    LabOrderStatus.collected: {LabOrderStatus.processing, LabOrderStatus.cancelled},
+    LabOrderStatus.processing: {LabOrderStatus.completed, LabOrderStatus.cancelled},
+    LabOrderStatus.completed: set(),
+    LabOrderStatus.cancelled: set(),
+}
 
 
 def _alert_append(alert: ClinicalAlert, alert_type: str, message: str) -> None:
@@ -36,6 +47,24 @@ def get_lab_order(db: Session, order_id: bytes, tenant_id: str) -> LabOrder:
     order = db.query(LabOrder).filter(LabOrder.id == order_id, LabOrder.tenant_id == tenant_id).first()
     if not order:
         raise not_found("Lab order not found.")
+    return order
+
+
+def update_lab_order_status(db: Session, order_id: bytes, tenant_id: str, data: LabOrderUpdate, user_id: bytes) -> LabOrder:
+    order = get_lab_order(db, order_id, tenant_id)
+    if data.status is not None and data.status != order.status:
+        if data.status not in LAB_ALLOWED_TRANSITIONS[order.status]:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Cannot transition lab order from '{order.status.value}' to '{data.status.value}'",
+            )
+    old = model_to_dict(order)
+    updates = data.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(order, field, value)
+    audit(db, user_id=user_id, tenant_id=tenant_id, action="UPDATE", table_name="lab_orders", record_id=order.id, old_values=old, new_values=model_to_dict(order))
+    commit_or_409(db)
+    db.refresh(order)
     return order
 
 

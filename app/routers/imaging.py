@@ -8,10 +8,11 @@ from app.dependencies.db import get_db
 from app.models.imaging import ImagingReport, ImagingStudy
 from app.models.tenant import User, UserRole
 from app.routers._utils import audit_mutation, commit_or_409, data_for_create, data_for_model, get_by_id_or_404, model_to_dict, uuid_bytes
-from app.schemas.imaging import ImagingReportCreate, ImagingReportRead, ImagingStudyCreate, ImagingStudyDetail, ImagingStudyRead
+from app.schemas.imaging import ImagingReportCreate, ImagingReportRead, ImagingStudyCreate, ImagingStudyDetail, ImagingStudyRead, ImagingStudyUpdate
 from app.services.imaging_service import add_imaging_report as svc_add_imaging_report
 from app.services.imaging_service import create_imaging_study as svc_create_imaging_study
 from app.services.imaging_service import get_imaging_study as svc_get_imaging_study
+from app.services.imaging_service import update_imaging_status as svc_update_imaging_status
 
 router = APIRouter(prefix="/api/v1/imaging-studies", tags=["Imaging"])
 
@@ -45,6 +46,17 @@ def get_imaging_study(study_id: UUID, db: Session = Depends(get_db), current_use
     data["reports"] = db.query(ImagingReport).filter(ImagingReport.imaging_study_id == study.id, ImagingReport.tenant_id == current_user.tenant_id).all()
     data["attachments"] = []
     return data
+
+
+@router.patch("/{study_id}/status", response_model=ImagingStudyRead)
+def update_imaging_status(
+    study_id: UUID,
+    data: ImagingStudyUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.doctor, UserRole.resident)),
+):
+    return svc_update_imaging_status(db, study_id.bytes, current_user.tenant_id, data, current_user.id)
 
 
 @router.post("/{study_id}/reports", response_model=ImagingReportRead, status_code=status.HTTP_201_CREATED)

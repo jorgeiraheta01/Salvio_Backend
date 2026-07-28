@@ -8,10 +8,11 @@ from app.dependencies.db import get_db
 from app.models.lab import LabOrder, LabOrderItem, LabResult
 from app.models.tenant import User, UserRole
 from app.routers._utils import audit_mutation, commit_or_409, data_for_create, data_for_model, get_by_id_or_404, model_to_dict, uuid_bytes
-from app.schemas.lab import LabOrderCreate, LabOrderDetail, LabOrderRead, LabResultCreate, LabResultRead
+from app.schemas.lab import LabOrderCreate, LabOrderDetail, LabOrderRead, LabOrderUpdate, LabResultCreate, LabResultRead
 from app.services.lab_service import create_lab_order as svc_create_lab_order
 from app.services.lab_service import get_lab_order as svc_get_lab_order
 from app.services.lab_service import register_lab_result as svc_register_lab_result
+from app.services.lab_service import update_lab_order_status as svc_update_lab_order_status
 
 router = APIRouter(prefix="/api/v1/lab-orders", tags=["Lab"])
 
@@ -46,6 +47,17 @@ def get_lab_order(order_id: UUID, db: Session = Depends(get_db), current_user: U
     data["results"] = db.query(LabResult).filter(LabResult.lab_order_id == order.id, LabResult.tenant_id == current_user.tenant_id).all()
     data["specimens"] = []
     return data
+
+
+@router.patch("/{order_id}/status", response_model=LabOrderRead)
+def update_lab_order_status(
+    order_id: UUID,
+    data: LabOrderUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.nurse, UserRole.doctor)),
+):
+    return svc_update_lab_order_status(db, order_id.bytes, current_user.tenant_id, data, current_user.id)
 
 
 @router.post("/{order_id}/results", response_model=LabResultRead, status_code=status.HTTP_201_CREATED)
