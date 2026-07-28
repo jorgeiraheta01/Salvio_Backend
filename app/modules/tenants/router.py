@@ -5,12 +5,13 @@ from app.database import get_control_engine
 from app.dependencies.platform_auth import get_current_platform_admin
 from app.models.platform_admin import PlatformAdmin
 from app.modules.tenants.schemas import (
+    TenantDashboardResponse,
     TenantProvisionRequest,
     TenantProvisionResponse,
     TenantSummary,
     TenantUpdateRequest,
 )
-from app.modules.tenants.service import create_tenant, list_tenants, update_tenant
+from app.modules.tenants.service import create_tenant, list_tenants, tenant_dashboard_stats, update_tenant
 from app.utils.control_audit import log_control_audit
 
 router = APIRouter(prefix="/api/v1/tenants", tags=["Tenants"])
@@ -54,6 +55,13 @@ def provision_tenant(
         new_values={"tenant_name": result["tenant_name"], "admin_email": result["admin_email"], "doctors_created": result["doctors_created"]},
     )
     return TenantProvisionResponse(**result)
+
+
+@router.get("/dashboard", response_model=TenantDashboardResponse)
+def get_tenant_dashboard(
+    _current_admin: PlatformAdmin = Depends(get_current_platform_admin),
+) -> TenantDashboardResponse:
+    return TenantDashboardResponse(**tenant_dashboard_stats())
 
 
 @router.get("", response_model=list[TenantSummary])

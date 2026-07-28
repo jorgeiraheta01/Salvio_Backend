@@ -6,12 +6,16 @@ from typing import Iterator
 from uuid import uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, func, text
 from sqlalchemy.engine import URL, make_url
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.database import DATABASE_URL
+from app.models.appointment import Appointment
+from app.models.billing import Billing, BillingStatus
+from app.models.encounter import Encounter
+from app.models.patient import Patient
 from app.models.tenant import Tenant, TenantStatus, User, UserRole
 from app.utils.password import normalize_password, pwd_context
 
@@ -323,3 +327,65 @@ def update_tenant(tenant_id: str, name: str | None, status: TenantStatus | None)
     finally:
         db.close()
         tenant_engine.dispose()
+
+
+def tenant_dashboard_stats() -> dict:
+    """Grupo D: solo agregados (conteos/sumas) -- nunca contenido clinico
+    individual de pacientes, segun lo ya aprobado. Mismo patron de fan-out
+    que list_tenants() (una conexion desechable por BD de tenant, se
+    salta silenciosamente cualquiera que falle -- no es peor que lo que ya
+    hace list_tenants)."""
+    admin_engine = create_engine(_server_database_url(), pool_pre_ping=True)
+    try:
+        with admin_engine.connect() as connection:
+            rows = connection.execute(text("SHOW DATABASES LIKE 'salvio\\_%'")).fetchall()
+        db_names = [row[0] for row in rows if row[0] not in _RESERVED_DB_NAMES]
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Dashboard aggregation failed: {exc}") from exc
+    finally:
+        admin_engine.dispose()
+
+    tenants: list[dict] = []
+    totals = {"patients": 0, "appointments": 0, "encounters": 0, "billing_pending": 0.0, "billing_paid": 0.0}
+
+    for db_name in db_names:
+        tenant_id = db_name.removeprefix("salvio_")
+        tenant_engine = create_engine(_tenant_database_url(db_name), pool_pre_ping=True)
+        try:
+            session_factory = sessionmaker(autocommit=False, autoflush=False, bind=tenant_engine)
+            db: Session = session_factory()
+            try:
+                tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+                if tenant is None:
+                    continue
+                patients_count = db.query(func.count(Patient.id)).filter(Patient.tenant_id == tenant_id, Patient.deleted_at.is_(None)).scalar() or 0
+                appointments_count = db.query(func.count(Appointment.id)).filter(Appointment.tenant_id == tenant_id, Appointment.deleted_at.is_(None)).scalar() or 0
+                encounters_count = db.query(func.count(Encounter.id)).filter(Encounter.tenant_id == tenant_id).scalar() or 0
+                billing_pending = float(db.query(func.coalesce(func.sum(Billing.amount), 0)).filter(Billing.tenant_id == tenant_id, Billing.status == BillingStatus.pending).scalar() or 0)
+                billing_paid = float(db.query(func.coalesce(func.sum(Billing.amount), 0)).filter(Billing.tenant_id == tenant_id, Billing.status == BillingStatus.paid).scalar() or 0)
+
+                entry = {
+                    "tenant_id": tenant.id,
+                    "name": tenant.name,
+                    "status": tenant.status,
+                    "patients_count": patients_count,
+                    "appointments_count": appointments_count,
+                    "encounters_count": encounters_count,
+                    "billing_pending": billing_pending,
+                    "billing_paid": billing_paid,
+                }
+                tenants.append(entry)
+                totals["patients"] += patients_count
+                totals["appointments"] += appointments_count
+                totals["encounters"] += encounters_count
+                totals["billing_pending"] += billing_pending
+                totals["billing_paid"] += billing_paid
+            finally:
+                db.close()
+        except SQLAlchemyError:
+            continue
+        finally:
+            tenant_engine.dispose()
+
+    tenants.sort(key=lambda t: t["tenant_id"])
+    return {"tenants": tenants, "totals": totals}

@@ -40,3 +40,27 @@ class TenantSummary(BaseModel):
 class TenantUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     status: TenantStatus | None = None
+
+
+class TenantDashboardEntry(BaseModel):
+    tenant_id: str
+    name: str
+    status: TenantStatus
+    patients_count: int
+    appointments_count: int
+    encounters_count: int
+    billing_pending: float
+    billing_paid: float
+
+
+class TenantDashboardTotals(BaseModel):
+    patients: int
+    appointments: int
+    encounters: int
+    billing_pending: float
+    billing_paid: float
+
+
+class TenantDashboardResponse(BaseModel):
+    tenants: list[TenantDashboardEntry]
+    totals: TenantDashboardTotals
