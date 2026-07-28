@@ -28,6 +28,8 @@ class ClinicalSystemCatalog(Base):
     system_name = Column(String(100), nullable=False, unique=True)
     applies_to = Column(SET('exam', 'review'), nullable=False, default="exam,review")
     sort_order = Column(TINYINT, nullable=False, default=0)
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
 
 class LabTestCatalog(Base):
@@ -38,4 +40,6 @@ class LabTestCatalog(Base):
     category = Column(String(100), nullable=True)
     unit = Column(String(50), nullable=True)
     ref_range = Column(String(100), nullable=True)
+    sample_type = Column(String(100), nullable=True)
+    is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())

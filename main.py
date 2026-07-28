@@ -5,7 +5,7 @@ from app.database import engine
 from app.middleware.tenant import TenantIsolationMiddleware
 from app.modules.platform_admin.router import router as platform_admin_router
 from app.modules.tenants.router import router as tenants_router
-from app.routers import appointments, auth, billing, clinical, clinical_notes, diagnoses, encounters, imaging, lab, orders, patients, prescriptions, referrals, users, vital_signs, wa
+from app.routers import appointments, auth, billing, catalogs, clinical, clinical_notes, diagnoses, encounters, imaging, lab, orders, patients, prescriptions, referrals, users, vital_signs, wa
 
 app = FastAPI()
 app.add_middleware(
@@ -35,6 +35,7 @@ app.include_router(imaging.router)
 app.include_router(referrals.router)
 app.include_router(billing.router)
 app.include_router(wa.router)
+app.include_router(catalogs.router)
 app.include_router(tenants_router)
 app.include_router(platform_admin_router)
 
