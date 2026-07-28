@@ -4,9 +4,24 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from app.models.appointment import Appointment, AppointmentStatus
+from app.models.billing import Billing, BillingStatus
+from app.models.encounter import Encounter, EncounterStatus
 from app.models.patient import Patient, PatientAllergy
 from app.schemas.patient import PatientCreate, PatientUpdate
 from app.services._utils import audit, commit_or_409, data_for_model, model_to_dict, new_uuid_bytes, not_found, uuid_bytes
+
+# H-05: chequeo pragmatico, no exhaustivo (igual criterio que H-01/H-02 en
+# user_service.py) -- solo se bloquea archivar si el paciente tiene una
+# relacion clinica/financiera activa. Ordenes de lab/imagenologia/referencias
+# pendientes quedan deliberadamente fuera: son registros informativos de
+# menor riesgo, no compromisos abiertos.
+APPOINTMENT_OPEN_STATUSES = {
+    AppointmentStatus.scheduled,
+    AppointmentStatus.confirmed,
+    AppointmentStatus.checked_in,
+    AppointmentStatus.in_consultation,
+}
 
 
 def generate_mrn(db: Session, tenant_id: str) -> str:
@@ -67,6 +82,33 @@ def update_patient(db: Session, patient_id: bytes, tenant_id: str, data: Patient
 
 def soft_delete_patient(db: Session, patient_id: bytes, tenant_id: str, user_id: bytes) -> None:
     patient = get_patient(db, patient_id, tenant_id)
+
+    open_appointments = (
+        db.query(Appointment)
+        .filter(
+            Appointment.patient_id == patient_id,
+            Appointment.tenant_id == tenant_id,
+            Appointment.deleted_at.is_(None),
+            Appointment.status.in_(APPOINTMENT_OPEN_STATUSES),
+            Appointment.scheduled_at >= datetime.now(timezone.utc),
+        )
+        .count()
+    )
+    if open_appointments:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Cannot archive: patient has {open_appointments} future/open appointment(s).")
+
+    active_encounters = (
+        db.query(Encounter).filter(Encounter.patient_id == patient_id, Encounter.tenant_id == tenant_id, Encounter.status == EncounterStatus.active).count()
+    )
+    if active_encounters:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Cannot archive: patient has {active_encounters} active encounter(s).")
+
+    pending_billing = (
+        db.query(Billing).filter(Billing.patient_id == patient_id, Billing.tenant_id == tenant_id, Billing.status == BillingStatus.pending).count()
+    )
+    if pending_billing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Cannot archive: patient has {pending_billing} pending billing record(s).")
+
     old = model_to_dict(patient)
     patient.deleted_at = datetime.now(timezone.utc)
     audit(db, user_id=user_id, tenant_id=tenant_id, action="DELETE", table_name="patients", record_id=patient.id, old_values=old, new_values=model_to_dict(patient))
