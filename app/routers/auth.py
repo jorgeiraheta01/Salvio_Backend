@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import logging
+import os
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -42,6 +43,16 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 TENANT_ID_PATTERN = re.compile(r"^[a-z0-9_]+$")
 PASSWORD_RESET_EXPIRE_MINUTES = 30
 logger = logging.getLogger("salvio.auth")
+
+# H-15: 2FA para usuarios de clinica quedo fuera del alcance de la
+# auditoria (a diferencia del owner, donde SI es obligatorio -- ver Grupo A
+# / app/utils/totp.py) porque un usuario de clinica no puede tumbar la
+# plataforma entera. Antes esto era un `requires_2fa = False` hardcodeado
+# en medio del login, indistinguible de un TODO olvidado. Ahora es una
+# decision explicita via env var -- sigue apagado por defecto, pero queda
+# documentado que es una eleccion, no un descuido, y activable sin tocar
+# codigo si el negocio decide requerirlo.
+TENANT_2FA_ENABLED = os.getenv("TENANT_2FA_ENABLED", "false").lower() == "true"
 
 
 class LoginRequest(BaseModel):
@@ -111,8 +122,7 @@ def login(data: LoginRequest):
         if not user.is_active or not verify_password(data.password.get_secret_value(), user.hashed_password):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
 
-        requires_2fa = False
-        if requires_2fa:
+        if TENANT_2FA_ENABLED:
             temp_token = create_token(user, token_type="2fa", expires_delta=__import__("datetime").timedelta(minutes=5))
             return LoginResponse(access_token="", refresh_token=None, requires_2fa=True, temp_token=temp_token)
 
