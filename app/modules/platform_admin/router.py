@@ -1,14 +1,17 @@
 from datetime import datetime, timedelta, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials
 from jose import jwt
 from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy.orm import sessionmaker
 
 from app.database import get_control_engine
-from app.dependencies.auth import ALGORITHM, SECRET_KEY, verify_password
-from app.models.platform_admin import PlatformAdmin
+from app.dependencies.auth import ALGORITHM, SECRET_KEY, decode_token, verify_password
+from app.dependencies.platform_auth import get_current_platform_admin, get_platform_admin_credentials
+from app.models.platform_admin import ControlRevokedToken, PlatformAdmin
+from app.schemas.common import MessageResponse
 from app.utils.control_audit import log_control_audit
 
 router = APIRouter(prefix="/api/v1/platform-admin", tags=["Platform Admin"])
@@ -67,5 +70,43 @@ def platform_admin_login(data: PlatformAdminLoginRequest, request: Request) -> P
         )
         db.commit()
         return PlatformAdminLoginResponse(access_token=token)
+    finally:
+        db.close()
+
+
+@router.post("/logout", response_model=MessageResponse)
+def platform_admin_logout(
+    request: Request,
+    current_admin: PlatformAdmin = Depends(get_current_platform_admin),
+    credentials: HTTPAuthorizationCredentials = Depends(get_platform_admin_credentials),
+) -> MessageResponse:
+    payload = decode_token(credentials.credentials)
+    jti = payload.get("jti")
+    if not jti:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Token has no jti.")
+
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=get_control_engine())
+    db = session_factory()
+    try:
+        if not db.query(ControlRevokedToken).filter(ControlRevokedToken.jti == jti).first():
+            db.add(
+                ControlRevokedToken(
+                    id=uuid4().bytes,
+                    jti=jti,
+                    admin_id=current_admin.id,
+                    expires_at=datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
+                )
+            )
+        log_control_audit(
+            db,
+            admin_id=current_admin.id,
+            action="logout",
+            table_name="platform_admins",
+            record_id=current_admin.id,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+        db.commit()
+        return MessageResponse(message="OK")
     finally:
         db.close()

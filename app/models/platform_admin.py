@@ -18,3 +18,20 @@ class PlatformAdmin(ControlBase):
     full_name = Column(String(255), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
+
+
+class ControlRevokedToken(ControlBase):
+    """Tokens de platform_admin revocados por logout.
+
+    Antes de esto no existia forma de cerrar la sesion de un owner: los
+    tokens de 8h eran validos hasta que expiraban por su cuenta, sin
+    posibilidad de cortarlos antes (ej. si el dispositivo se perdio).
+    """
+
+    __tablename__ = "revoked_tokens"
+
+    id = Column(BINARY(16), primary_key=True)
+    jti = Column(String(255), nullable=False, unique=True)
+    admin_id = Column(BINARY(16), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
