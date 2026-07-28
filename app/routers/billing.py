@@ -9,10 +9,11 @@ from app.dependencies.db import get_db
 from app.models.billing import Billing, BillingItem, BillingStatus, Payment
 from app.models.tenant import User, UserRole
 from app.routers._utils import audit_mutation, commit_or_409, data_for_create, data_for_model, get_by_id_or_404, model_to_dict, uuid_bytes
-from app.schemas.billing import BillingCreate, BillingDetail, BillingRead, PaymentCreate, PaymentRead
+from app.schemas.billing import BillingCreate, BillingDetail, BillingRead, BillingUpdate, PaymentCreate, PaymentRead
 from app.schemas.common import PaginatedResponse
 from app.services.billing_service import create_billing as svc_create_billing
 from app.services.billing_service import register_payment as svc_register_payment
+from app.services.billing_service import update_billing as svc_update_billing
 
 router = APIRouter(prefix="/api/v1/billing", tags=["Billing"])
 BILLING_ROLES = (UserRole.clinic_admin, UserRole.accountant, UserRole.receptionist)
@@ -51,6 +52,17 @@ def get_billing(billing_id: UUID, db: Session = Depends(get_db), current_user: U
     data["items"] = db.query(BillingItem).filter(BillingItem.billing_id == billing.id, BillingItem.tenant_id == current_user.tenant_id).all()
     data["payments"] = db.query(Payment).filter(Payment.billing_id == billing.id, Payment.tenant_id == current_user.tenant_id).all()
     return data
+
+
+@router.patch("/{billing_id}", response_model=BillingRead)
+def update_billing(
+    billing_id: UUID,
+    data: BillingUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(*BILLING_ROLES)),
+):
+    return svc_update_billing(db, billing_id.bytes, current_user.tenant_id, data, current_user.id)
 
 
 @router.post("/{billing_id}/payments", response_model=PaymentRead, status_code=status.HTTP_201_CREATED)

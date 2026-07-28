@@ -6,11 +6,27 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.billing import Billing, BillingItem, BillingStatus, Payment, PaymentStatus
-from app.schemas.billing import BillingCreate, PaymentCreate
+from app.models.patient import Patient
+from app.schemas.billing import BillingCreate, BillingUpdate, PaymentCreate
 from app.services._utils import audit, commit_or_409, data_for_model, model_to_dict, new_uuid_bytes, not_found
+
+# H-03: unica transicion permitida es hacia adelante -- una vez void/refunded
+# no hay vuelta atras (evita reabrir una factura ya cerrada contablemente).
+BILLING_ALLOWED_TRANSITIONS = {
+    BillingStatus.pending: {BillingStatus.paid, BillingStatus.void},
+    BillingStatus.paid: {BillingStatus.refunded},
+    BillingStatus.void: set(),
+    BillingStatus.refunded: set(),
+}
 
 
 def create_billing(db: Session, tenant_id: str, data: BillingCreate, user_id: bytes) -> Billing:
+    # H-06: antes solo la FK protegia contra un patient_id inexistente, y ni
+    # eso contra uno archivado (soft-delete no rompe la FK).
+    patient = db.query(Patient).filter(Patient.id == data.patient_id.bytes, Patient.tenant_id == tenant_id, Patient.deleted_at.is_(None)).first()
+    if not patient:
+        raise not_found("Patient not found.")
+
     total_billing = Decimal("0")
     for item in data.items:
         item_total = (item.quantity * item.unit_price) - item.discount_amount + item.tax_amount
@@ -67,3 +83,25 @@ def register_payment(db: Session, billing_id: bytes, tenant_id: str, data: Payme
     db.refresh(billing)
     db.refresh(payment)
     return billing, payment
+
+
+def update_billing(db: Session, billing_id: bytes, tenant_id: str, data: BillingUpdate, user_id: bytes) -> Billing:
+    billing = db.query(Billing).filter(Billing.id == billing_id, Billing.tenant_id == tenant_id).first()
+    if not billing:
+        raise not_found("Billing not found.")
+
+    if data.status is not None and data.status != billing.status:
+        if data.status not in BILLING_ALLOWED_TRANSITIONS[billing.status]:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Cannot transition billing from '{billing.status.value}' to '{data.status.value}'",
+            )
+
+    old = model_to_dict(billing)
+    updates = data.model_dump(exclude_unset=True)
+    for field, value in updates.items():
+        setattr(billing, field, value)
+    audit(db, user_id=user_id, tenant_id=tenant_id, action="UPDATE", table_name="billing", record_id=billing.id, old_values=old, new_values=model_to_dict(billing))
+    commit_or_409(db)
+    db.refresh(billing)
+    return billing

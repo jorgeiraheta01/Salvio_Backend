@@ -116,3 +116,32 @@ def set_tenant_active(api, platform_token: str, tenant_id: str, is_active: bool)
         headers=auth_headers(platform_token),
     )
     resp.raise_for_status()
+
+
+def create_test_patient(api, admin_token: str, *, unique_seed: int) -> dict:
+    """Crea un paciente de prueba minimo en el tenant QA. unique_seed debe ser
+    unico por test (los tests corren contra la BD real, no aislada) para
+    evitar choques con el unique constraint de DUI -- ej. int(time.time() * 1000) % 10**8."""
+    dui_digits = f"{unique_seed % 10**8:08d}"
+    payload = {
+        "tenant_id": QA_TENANT,
+        "medical_record_number": f"TEST-{unique_seed}",
+        "first_name": "Test",
+        "last_name": f"Patient{unique_seed}",
+        "date_of_birth": "1990-01-01",
+        "gender": "other",
+        "dui": f"{dui_digits}-{unique_seed % 10}",
+        "insurance_type": "particular",
+    }
+    resp = api.post(f"{BASE_URL}/api/v1/patients", json=payload, headers=auth_headers(admin_token))
+    resp.raise_for_status()
+    return resp.json()
+
+
+def get_doctor_id(api, admin_token: str) -> str:
+    resp = api.get(f"{BASE_URL}/api/v1/users", headers=auth_headers(admin_token), params={"role": "doctor"})
+    resp.raise_for_status()
+    doctors = resp.json()
+    if not doctors:
+        raise RuntimeError("No hay medicos activos en el tenant QA.")
+    return doctors[0]["id"]
