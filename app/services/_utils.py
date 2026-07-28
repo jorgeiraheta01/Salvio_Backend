@@ -46,6 +46,12 @@ def model_to_dict(obj: Any) -> dict[str, Any]:
             data[column.name] = str(value)
         elif isinstance(value, Enum):
             data[column.name] = value.value
+        elif isinstance(value, (set, frozenset)):
+            # Columnas SET de MySQL (ej. clinical_systems_catalog.applies_to)
+            # se leen como set[str] -- no serializable a JSON tal cual, lo
+            # que rompia silenciosamente cualquier UPDATE que las auditara
+            # (commit_or_409 lo enmascaraba como 409 generico).
+            data[column.name] = sorted(value)
         else:
             data[column.name] = value
     return data

@@ -86,6 +86,13 @@ class ClinicalSystemCatalogUpdate(StrippedStringMixin, ORMModel):
     is_active: bool | None = None
 
 
-class ClinicalSystemCatalogRead(ClinicalSystemCatalogBase):
+class ClinicalSystemCatalogRead(StrippedStringMixin, ORMModel):
+    # applies_to viene de una columna SET de MySQL -- SQLAlchemy la lee como
+    # un set[str] de Python, no como el string que se manda al crear/editar.
     id: UUID
+    system_name: str
+    applies_to: set[str]
+    sort_order: int
+    description: str | None = None
+    is_active: bool
     created_at: datetime

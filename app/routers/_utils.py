@@ -54,6 +54,11 @@ def clean_value(value: Any) -> Any:
         return str(value)
     if isinstance(value, Enum):
         return value.value
+    if isinstance(value, (set, frozenset)):
+        # Columnas SET de MySQL se leen como set[str] -- no serializable a
+        # JSON tal cual (rompia silenciosamente cualquier audit_mutation
+        # sobre una fila con una columna SET).
+        return sorted(value)
     return value
 
 

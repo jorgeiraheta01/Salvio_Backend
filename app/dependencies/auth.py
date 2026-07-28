@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -41,7 +41,10 @@ def create_token(user: User, *, token_type: str, expires_delta: timedelta) -> st
         "role": user.role.value if hasattr(user.role, "value") else str(user.role),
         "type": token_type,
         "exp": expires_at,
-        "jti": f"{user_id}:{token_type}:{int(expires_at.timestamp())}",
+        # uuid4, no timestamp con resolucion de segundo -- dos tokens del
+        # mismo usuario/tipo emitidos en el mismo segundo antes colisionaban
+        # en el mismo jti, asi que revocar uno (logout) revocaba el otro.
+        "jti": f"{user_id}:{token_type}:{uuid4()}",
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 

@@ -76,7 +76,10 @@ def _issue_access_token(admin_id: str) -> str:
         "sub": admin_id,
         "type": "platform_admin",
         "exp": expires_at,
-        "jti": f"{admin_id}:platform_admin:{int(expires_at.timestamp())}",
+        # uuid4, no timestamp con resolucion de segundo -- dos logins del
+        # mismo admin dentro del mismo segundo antes generaban el mismo jti,
+        # asi que revocar uno (logout) revocaba el otro token tambien.
+        "jti": f"{admin_id}:platform_admin:{uuid4()}",
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 

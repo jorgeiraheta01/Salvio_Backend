@@ -54,7 +54,10 @@ def _log(db: Session, admin: PlatformAdmin, request: Request, **kwargs) -> None:
 def get_maintenance_mode(current_admin: PlatformAdmin = Depends(get_current_platform_admin)):
     db = _control_db()
     try:
-        return svc_get_maintenance_mode(db)
+        # Serializar mientras la sesion sigue abierta -- si se devuelve el
+        # objeto ORM crudo, FastAPI lo serializa DESPUES de que el `finally`
+        # ya cerro la sesion (DetachedInstanceError al leer sus atributos).
+        return MaintenanceModeRead.model_validate(svc_get_maintenance_mode(db))
     finally:
         db.close()
 
@@ -68,8 +71,9 @@ def update_maintenance_mode(
     db = _control_db()
     try:
         result = svc_set_maintenance_mode(db, enabled=data.enabled, message=data.message, admin_id=current_admin.id)
+        response = MaintenanceModeRead.model_validate(result)
         _log(db, current_admin, request, action="maintenance_mode_update", table_name="maintenance_mode", new_values={"enabled": data.enabled, "message": data.message})
-        return result
+        return response
     finally:
         db.close()
 
@@ -78,7 +82,7 @@ def update_maintenance_mode(
 def list_announcements(current_admin: PlatformAdmin = Depends(get_current_platform_admin)):
     db = _control_db()
     try:
-        return svc_list_announcements(db)
+        return [AnnouncementRead.model_validate(a) for a in svc_list_announcements(db)]
     finally:
         db.close()
 
@@ -88,8 +92,9 @@ def create_announcement(data: AnnouncementCreate, request: Request, current_admi
     db = _control_db()
     try:
         result = svc_create_announcement(db, message=data.message, severity=data.severity, admin_id=current_admin.id)
+        response = AnnouncementRead.model_validate(result)
         _log(db, current_admin, request, action="announcement_create", table_name="platform_announcements", record_id=result.id, new_values={"message": data.message, "severity": data.severity.value})
-        return result
+        return response
     finally:
         db.close()
 
@@ -101,8 +106,9 @@ def update_announcement(announcement_id: UUID, data: AnnouncementUpdate, request
         result = svc_update_announcement(db, announcement_id.bytes, message=data.message, severity=data.severity, active=data.active)
         if not result:
             raise HTTPException(status_code=404, detail="Announcement not found.")
+        response = AnnouncementRead.model_validate(result)
         _log(db, current_admin, request, action="announcement_update", table_name="platform_announcements", record_id=announcement_id.bytes, new_values=data.model_dump(exclude_unset=True))
-        return result
+        return response
     finally:
         db.close()
 
@@ -111,7 +117,7 @@ def update_announcement(announcement_id: UUID, data: AnnouncementUpdate, request
 def list_feature_flags_admin(current_admin: PlatformAdmin = Depends(get_current_platform_admin)):
     db = _control_db()
     try:
-        return svc_list_feature_flags(db)
+        return [FeatureFlagRead.model_validate(f) for f in svc_list_feature_flags(db)]
     finally:
         db.close()
 
@@ -121,8 +127,9 @@ def create_feature_flag(data: FeatureFlagCreate, request: Request, current_admin
     db = _control_db()
     try:
         result = svc_create_feature_flag(db, key=data.key, enabled=data.enabled, description=data.description)
+        response = FeatureFlagRead.model_validate(result)
         _log(db, current_admin, request, action="feature_flag_create", table_name="feature_flags", record_id=result.id, new_values={"key": data.key, "enabled": data.enabled})
-        return result
+        return response
     finally:
         db.close()
 
@@ -134,8 +141,9 @@ def update_feature_flag(flag_id: UUID, data: FeatureFlagUpdate, request: Request
         result = svc_update_feature_flag(db, flag_id.bytes, enabled=data.enabled, description=data.description)
         if not result:
             raise HTTPException(status_code=404, detail="Feature flag not found.")
+        response = FeatureFlagRead.model_validate(result)
         _log(db, current_admin, request, action="feature_flag_update", table_name="feature_flags", record_id=flag_id.bytes, new_values=data.model_dump(exclude_unset=True))
-        return result
+        return response
     finally:
         db.close()
 
@@ -148,7 +156,7 @@ def update_feature_flag(flag_id: UUID, data: FeatureFlagUpdate, request: Request
 def list_active_announcements(current_user: User = Depends(get_current_user)):
     db = _control_db()
     try:
-        return svc_list_announcements(db, only_active=True)
+        return [AnnouncementRead.model_validate(a) for a in svc_list_announcements(db, only_active=True)]
     finally:
         db.close()
 
@@ -157,6 +165,6 @@ def list_active_announcements(current_user: User = Depends(get_current_user)):
 def list_feature_flags_tenant(current_user: User = Depends(get_current_user)):
     db = _control_db()
     try:
-        return svc_list_feature_flags(db)
+        return [FeatureFlagRead.model_validate(f) for f in svc_list_feature_flags(db)]
     finally:
         db.close()
