@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Depends, Query
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
-from app.dependencies.auth import get_current_user
+from app.dependencies.auth import get_current_user, require_roles
 from app.dependencies.db import get_db
 from app.models.tenant import Tenant, User, UserRole
-from app.schemas.user import TenantSelfRead, UserDirectoryEntry
+from app.schemas.user import TenantSelfRead, UserDirectoryEntry, UserRead, UserUpdate
+from app.services.user_service import deactivate_user as svc_deactivate_user
+from app.services.user_service import reactivate_user as svc_reactivate_user
+from app.services.user_service import update_user as svc_update_user
 
 router = APIRouter(prefix="/api/v1/users", tags=["Users"])
 
@@ -22,6 +27,37 @@ def list_users(
     if role:
         query = query.filter(User.role == role)
     return query.order_by(User.full_name.asc()).all()
+
+
+@router.patch("/{user_id}", response_model=UserRead)
+def update_user(
+    user_id: UUID,
+    data: UserUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.clinic_admin)),
+):
+    return svc_update_user(db, user_id.bytes, current_user.tenant_id, data, current_user.id)
+
+
+@router.patch("/{user_id}/deactivate", response_model=UserRead)
+def deactivate_user(
+    user_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.clinic_admin)),
+):
+    return svc_deactivate_user(db, user_id.bytes, current_user.tenant_id, current_user.id)
+
+
+@router.patch("/{user_id}/reactivate", response_model=UserRead)
+def reactivate_user(
+    user_id: UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.clinic_admin)),
+):
+    return svc_reactivate_user(db, user_id.bytes, current_user.tenant_id, current_user.id)
 
 
 tenant_router = APIRouter(prefix="/api/v1/tenant", tags=["Users"])
