@@ -17,9 +17,14 @@ Convenciones:
   salvio_tenant_template y a TODAS las BDs salvio_<tenant_id> existentes.
 - sql/migrations/control/NNNN_descripcion.sql (+ _down.sql) -- se aplica
   SOLO a salvio_control (esquema distinto, linea de migraciones separada).
-- Cada archivo debe ser idempotente por si mismo (CREATE TABLE IF NOT
-  EXISTS, ADD COLUMN IF NOT EXISTS -- soportado desde MySQL 8.0.29) como
-  segunda capa de seguridad ademas del tracking en `schema_migrations`.
+- CREATE TABLE IF NOT EXISTS / DROP TABLE IF EXISTS son validos en MySQL
+  estandar y se usan como segunda capa de idempotencia ademas del tracking.
+  OJO: `ADD COLUMN IF NOT EXISTS` / `DROP COLUMN IF EXISTS` es sintaxis de
+  MariaDB, NO de MySQL real -- MySQL 8.0.45 la rechaza con ERROR 1064
+  (confirmado a mano). Para ALTER TABLE (agregar/quitar columnas) la unica
+  garantia de idempotencia es el tracking en `schema_migrations` -- no hay
+  capa extra a nivel SQL, así que no correr esas migraciones a mano fuera
+  de este runner.
 - Toda migracion nueva DEBE tener su _down.sql con downgrade real. Sin
   downgrade, no se acepta la migracion (regla dura, no opcional).
 

@@ -32,7 +32,10 @@ pydantic_core==2.41.5
 PyMySQL==1.1.2
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
+pillow==12.3.0
+pyotp==2.9.0
 python-jose==3.5.0
+qrcode==8.0
 python-multipart==0.0.24
 PyYAML==6.0.3
 redis==7.4.0
