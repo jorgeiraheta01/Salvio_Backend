@@ -141,9 +141,17 @@ def verify_2fa(data: TwoFAVerifyRequest):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
     db = _tenant_session(tenant_id)
     try:
-        user = db.query(User).filter(User.id == __import__("uuid").UUID(payload["sub"]).bytes, User.tenant_id == tenant_id, User.deleted_at.is_(None)).first()
-        if not user or not user.is_active:
+        row = (
+            db.query(User, Tenant.is_active)
+            .outerjoin(Tenant, Tenant.id == User.tenant_id)
+            .filter(User.id == __import__("uuid").UUID(payload["sub"]).bytes, User.tenant_id == tenant_id, User.deleted_at.is_(None))
+            .first()
+        )
+        if not row or not row[0].is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
+        user, tenant_is_active = row
+        if tenant_is_active is not None and not tenant_is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
         return TwoFAVerifyResponse(access_token=create_access_token(user), refresh_token=create_refresh_token(user), user=user)
     finally:
         db.close()
@@ -159,9 +167,20 @@ def refresh_token(data: RefreshTokenRequest):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
     db = _tenant_session(tenant_id)
     try:
-        user = db.query(User).filter(User.id == __import__("uuid").UUID(payload["sub"]).bytes, User.tenant_id == tenant_id, User.deleted_at.is_(None)).first()
-        if not user or not user.is_active:
+        # H-09: a clinic deactivated after the refresh token was issued must not
+        # be able to keep minting new access tokens. Single joined query, same
+        # tenant connection already open for the user lookup.
+        row = (
+            db.query(User, Tenant.is_active)
+            .outerjoin(Tenant, Tenant.id == User.tenant_id)
+            .filter(User.id == __import__("uuid").UUID(payload["sub"]).bytes, User.tenant_id == tenant_id, User.deleted_at.is_(None))
+            .first()
+        )
+        if not row or not row[0].is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
+        user, tenant_is_active = row
+        if tenant_is_active is not None and not tenant_is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
         return RefreshTokenResponse(access_token=create_access_token(user))
     finally:
         db.close()

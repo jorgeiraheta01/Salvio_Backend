@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import get_tenant_engine
 from app.dependencies.db import get_db
-from app.models.tenant import RevokedToken, User, UserRole
+from app.models.tenant import RevokedToken, Tenant, User, UserRole
 from app.utils.password import normalize_password, pwd_context
 
 security = HTTPBearer(auto_error=True)
@@ -79,16 +79,28 @@ def get_current_user(
     tenant_session_factory = sessionmaker(autocommit=False, autoflush=False, bind=get_tenant_engine(tenant_id))
     tenant_db: Session = tenant_session_factory()
     try:
-        user = (
-            tenant_db.query(User)
+        # H-09: join Tenant in the same query (single round trip) so a clinic
+        # deactivated after this token was issued cuts the session immediately,
+        # not just future logins. tenants.id is that table's primary key, and
+        # both tables live in the same per-tenant database, so this adds no
+        # extra connection and no extra query -- just one more WHERE clause on
+        # a query that already had to run.
+        row = (
+            tenant_db.query(User, Tenant.is_active)
+            .outerjoin(Tenant, Tenant.id == User.tenant_id)
             .filter(User.id == _uuid_bytes(user_id), User.tenant_id == tenant_id, User.deleted_at.is_(None))
             .first()
         )
     finally:
         tenant_db.close()
 
-    if not user or not user.is_active:
+    if not row:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
+    user, tenant_is_active = row
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
+    if tenant_is_active is not None and not tenant_is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
     return user
 
 
