@@ -95,16 +95,28 @@ class EncounterClinicalNoteRead(TimestampMixin):
 
 DiagnosisKind = Literal["presumptive", "definitive", "ruled_out"]
 DiagnosisClassification = Literal["primary", "secondary", "background"]
+DiagnosisStatusLiteral = Literal["active", "resolved", "chronic", "recurrent"]
+DiagnosisSeverityLiteral = Literal["mild", "moderate", "severe"]
 
 
 class EncounterDiagnosisCreate(ORMModel):
     encounter_id: UUID
     clinical_record_id: UUID | None = None
     code: str = Field(min_length=3, max_length=10)
-    description: str = Field(min_length=1, max_length=255)
+    description: str = Field(min_length=1, max_length=4000)
     type: DiagnosisKind
     classification: DiagnosisClassification
+    status: DiagnosisStatusLiteral = "active"
+    severity: DiagnosisSeverityLiteral | None = None
     is_first_time: bool = False
+    notes: str | None = None
+
+
+class EncounterDiagnosisUpdate(ORMModel):
+    type: DiagnosisKind | None = None
+    classification: DiagnosisClassification | None = None
+    status: DiagnosisStatusLiteral | None = None
+    severity: DiagnosisSeverityLiteral | None = None
     notes: str | None = None
 
 
@@ -115,6 +127,8 @@ class EncounterDiagnosisRead(TimestampMixin):
     description: str
     type: DiagnosisKind
     classification: DiagnosisClassification
+    status: DiagnosisStatusLiteral
+    severity: DiagnosisSeverityLiteral | None = None
     is_first_time: bool
     notes: str | None = None
     version: int

@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Any
@@ -10,6 +10,25 @@ from sqlalchemy.orm import Session
 
 from app.models.tenant import User
 from app.utils.audit import log_audit
+
+# El Salvador es UTC-6 todo el ano (sin horario de verano) -- unica zona
+# horaria que maneja Salvio hoy, no hay campo de timezone por tenant. El
+# frontend guarda `scheduled_at` convertido a UTC (new Date(...).toISOString()
+# sobre un datetime-local, ver new-appointment-dialog.tsx) y lo vuelve a
+# convertir a local para mostrarlo (parseServerDateTime en dates.ts) -- pero
+# un filtro por "dia calendario" tiene que hacer la misma conversion, si no
+# una cita de las 6pm-12am hora local cae en el dia UTC siguiente y
+# "desaparece" del filtro de "hoy". Hasta que exista timezone por tenant,
+# este offset fijo es la unica forma correcta de calcular limites de dia.
+LOCAL_UTC_OFFSET = timedelta(hours=6)
+
+
+def local_day_utc_range(local_date: date) -> tuple[datetime, datetime]:
+    """Medianoche a medianoche de `local_date` (hora de El Salvador),
+    expresado en los mismos terminos UTC-crudos en que se guarda
+    `scheduled_at` -- ver LOCAL_UTC_OFFSET."""
+    start = datetime.combine(local_date, datetime.min.time()) + LOCAL_UTC_OFFSET
+    return start, start + timedelta(days=1)
 
 
 def uuid_bytes(value: UUID | str | bytes | bytearray | None) -> bytes | None:

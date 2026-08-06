@@ -1,4 +1,6 @@
 import os
+from datetime import timezone
+from uuid import UUID
 from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -52,6 +54,39 @@ def get_tenant_engine(tenant_id: str) -> Engine:
     return _tenant_engines[tenant_id]
 
 
+def _cutoff_rejects(issued_at: int | None, invalidated_at) -> bool:
+    if invalidated_at is None:
+        return False
+    cutoff = invalidated_at.replace(tzinfo=timezone.utc).timestamp()
+    return issued_at is None or issued_at < cutoff
+
+
+def _reject_if_session_invalidated(db: Session, tenant_id: str, payload: dict) -> None:
+    """Comparte el chequeo de force-logout entre get_db() y /auth/refresh.
+    Dos niveles independientes: clinica completa (Tenant.sessions_invalidated_at,
+    "Cerrar sesiones" a nivel tenant) y una sola persona
+    (User.sessions_invalidated_at, "Cerrar sesion" de un miembro del equipo).
+    Import diferido de Tenant/User para evitar el ciclo app.database <->
+    app.models.tenant (models/tenant.py hace `from app.database import Base`)."""
+    from app.models.tenant import Tenant, User
+
+    issued_at = payload.get("iat")
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    if tenant is not None and _cutoff_rejects(issued_at, tenant.sessions_invalidated_at):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session revoked. Please sign in again.")
+
+    user_id = payload.get("sub")
+    if user_id:
+        try:
+            user_bytes = UUID(user_id).bytes
+        except ValueError:
+            return
+        user = db.query(User).filter(User.id == user_bytes, User.tenant_id == tenant_id).first()
+        if user is not None and _cutoff_rejects(issued_at, user.sessions_invalidated_at):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session revoked. Please sign in again.")
+
+
 def get_db(credentials: HTTPAuthorizationCredentials | None = Depends(_tenant_bearer)):
     """Tenant-aware DB session dependency. Resolves the target database from the
     tenant_id claim of the caller's JWT (the same source of truth used at login),
@@ -71,6 +106,7 @@ def get_db(credentials: HTTPAuthorizationCredentials | None = Depends(_tenant_be
     session_factory = sessionmaker(autocommit=False, autoflush=False, bind=get_tenant_engine(tenant_id))
     db: Session = session_factory()
     try:
+        _reject_if_session_invalidated(db, tenant_id, payload)
         yield db
     finally:
         db.close()

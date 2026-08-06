@@ -2,7 +2,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models.catalogs import ClinicalSystemCatalog, LabTestCatalog
+from app.models.catalogs import Cie10Catalog, ClinicalSystemCatalog, LabTestCatalog
 from app.models.inventory import MedicationCatalog
 from app.services._utils import audit, commit_or_409, data_for_model, model_to_dict, new_uuid_bytes, not_found
 
@@ -37,6 +37,39 @@ def update_medication(db: Session, item_id: bytes, tenant_id: str, data: Any, us
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
     audit(db, user_id=user_id, tenant_id=tenant_id, action="UPDATE", table_name="medication_catalog", record_id=item.id, old_values=old, new_values=model_to_dict(item))
+    commit_or_409(db)
+    db.refresh(item)
+    return item
+
+
+def search_cie10(db: Session, q: str | None, limit: int = 20) -> list[Cie10Catalog]:
+    query = db.query(Cie10Catalog).filter(Cie10Catalog.is_active.is_(True))
+    if q:
+        like = f"%{q}%"
+        query = query.filter((Cie10Catalog.code.ilike(like)) | (Cie10Catalog.description.ilike(like)))
+    return query.order_by(Cie10Catalog.code).limit(limit).all()
+
+
+def create_cie10(db: Session, tenant_id: str, data: Any, user_id: bytes) -> Cie10Catalog:
+    payload = data_for_model(data, Cie10Catalog)
+    payload["id"] = new_uuid_bytes()
+    item = Cie10Catalog(**payload)
+    db.add(item)
+    db.flush()
+    audit(db, user_id=user_id, tenant_id=tenant_id, action="INSERT", table_name="cie10_catalog", record_id=item.id, new_values=model_to_dict(item))
+    commit_or_409(db)
+    db.refresh(item)
+    return item
+
+
+def update_cie10(db: Session, item_id: bytes, tenant_id: str, data: Any, user_id: bytes) -> Cie10Catalog:
+    item = db.query(Cie10Catalog).filter(Cie10Catalog.id == item_id).first()
+    if not item:
+        raise not_found("CIE-10 catalog entry not found.")
+    old = model_to_dict(item)
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(item, field, value)
+    audit(db, user_id=user_id, tenant_id=tenant_id, action="UPDATE", table_name="cie10_catalog", record_id=item.id, old_values=old, new_values=model_to_dict(item))
     commit_or_409(db)
     db.refresh(item)
     return item

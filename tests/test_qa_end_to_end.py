@@ -26,7 +26,8 @@ def test_full_patient_lifecycle_end_to_end(api):
     doctor_id = get_doctor_id(api, admin_token)
 
     # 1. Crear paciente
-    patient = create_test_patient(api, admin_token, unique_seed=int(time.time() * 1000) % 10**8)
+    seed = int(time.time() * 1000) % 10**8
+    patient = create_test_patient(api, admin_token, unique_seed=seed)
     patient_id = patient["id"]
 
     # 2. Agendar cita
@@ -36,7 +37,9 @@ def test_full_patient_lifecycle_end_to_end(api):
             "tenant_id": QA_TENANT,
             "patient_id": patient_id,
             "doctor_id": doctor_id,
-            "scheduled_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
+            # offset por seed para no chocar con la cita "completed" (sigue
+            # activa para el chequeo de choque) que dejan corridas previas
+            "scheduled_at": (datetime.now(timezone.utc) + timedelta(hours=1, minutes=seed % 500)).isoformat(),
         },
         headers=auth_headers(admin_token),
     )

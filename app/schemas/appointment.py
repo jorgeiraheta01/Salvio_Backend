@@ -58,6 +58,12 @@ class AppointmentRead(AppointmentBase, TimestampMixin, SoftDeleteMixin):
     id: UUID
 
 
+class AppointmentRescheduleRequest(ORMModel):
+    new_scheduled_at: datetime
+    new_doctor_id: UUID | None = None
+    reason: str = Field(min_length=3)
+
+
 class PatientAdmissionBase(StrippedStringMixin, ORMModel):
     patient_id: UUID
     tenant_id: str = Field(max_length=50)

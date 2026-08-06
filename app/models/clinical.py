@@ -16,6 +16,17 @@ class DiagnosisType(str, enum.Enum):
     definitive = "definitive"
     ruled_out = "ruled_out"
 
+class DiagnosisStatus(str, enum.Enum):
+    active = "active"
+    resolved = "resolved"
+    chronic = "chronic"
+    recurrent = "recurrent"
+
+class DiagnosisSeverity(str, enum.Enum):
+    mild = "mild"
+    moderate = "moderate"
+    severe = "severe"
+
 class NoteType(str, enum.Enum):
     progress = "progress"
     nursing = "nursing"
@@ -175,12 +186,14 @@ class RecordDiagnosis(Base):
     tenant_id = Column(String(50), ForeignKey("tenants.id"), nullable=False)
     clinical_problem_id = Column(BINARY(16), ForeignKey("clinical_problems.id", ondelete="SET NULL"), nullable=True)
     cie10_code = Column(String(10), nullable=False)
-    cie10_description = Column(String(255), nullable=False)
+    cie10_description = Column(Text, nullable=False)
     diagnosis_type = Column(SQLEnum(DiagnosisType), nullable=False)
     is_first_time = Column(Boolean, nullable=False)
     is_primary_diagnosis = Column(Boolean, nullable=False)
     is_background = Column(Boolean, nullable=False)
     is_outpatient = Column(Boolean, nullable=False)
+    status = Column(SQLEnum(DiagnosisStatus), nullable=False, default=DiagnosisStatus.active)
+    severity = Column(SQLEnum(DiagnosisSeverity), nullable=True)
     notes = Column(Text, nullable=True)
     created_by = Column(BINARY(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     updated_by = Column(BINARY(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

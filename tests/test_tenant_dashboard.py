@@ -19,7 +19,7 @@ def test_dashboard_returns_aggregated_counts_for_owner(api):
     assert qa_entry["patients_count"] >= 0
     assert qa_entry["appointments_count"] >= 0
     assert isinstance(qa_entry["billing_pending"], (int, float))
-    # nunca contenido clinico individual -- solo estas 5 metricas + identidad basica
+    # nunca contenido clinico individual -- solo agregados/conteos + identidad basica
     assert set(qa_entry.keys()) == {
         "tenant_id",
         "name",
@@ -29,6 +29,14 @@ def test_dashboard_returns_aggregated_counts_for_owner(api):
         "encounters_count",
         "billing_pending",
         "billing_paid",
+        "staff_count",
+        "last_activity_at",
+        "prescriptions_count",
+        "lab_orders_count",
+        "appointments_completed",
+        "appointments_cancelled",
+        "modules_active",
+        "modules_total",
     }
 
 

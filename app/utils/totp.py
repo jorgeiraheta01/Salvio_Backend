@@ -23,7 +23,12 @@ def _fernet() -> Fernet:
     # clave valida con SHA-256, determinista para el mismo valor de env.
     # Leido en el momento de uso (no a nivel de modulo) para que los tests
     # puedan correr aunque la env var no este seteada hasta el arranque real.
-    raw_key = os.getenv("TOTP_ENCRYPTION_KEY") or "salvio-dev-totp-key-change-me"
+    raw_key = os.getenv("TOTP_ENCRYPTION_KEY")
+    if not raw_key:
+        raise RuntimeError(
+            "TOTP_ENCRYPTION_KEY environment variable is not set. "
+            "Refusing to encrypt/decrypt platform-admin TOTP secrets with an insecure default key."
+        )
     digest = hashlib.sha256(raw_key.encode("utf-8")).digest()
     key = base64.urlsafe_b64encode(digest)
     return Fernet(key)

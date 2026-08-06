@@ -15,7 +15,12 @@ from app.utils.password import normalize_password, pwd_context
 
 security = HTTPBearer(auto_error=True)
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY") or "salvio-dev-secret-change-me"
+SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "JWT_SECRET_KEY (or SECRET_KEY) environment variable is not set. "
+        "Refusing to start with an insecure default signing key."
+    )
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "30"))
@@ -33,7 +38,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_token(user: User, *, token_type: str, expires_delta: timedelta) -> str:
-    expires_at = datetime.now(timezone.utc) + expires_delta
+    issued_at = datetime.now(timezone.utc)
+    expires_at = issued_at + expires_delta
     user_id = UUID(bytes=user.id) if isinstance(user.id, (bytes, bytearray)) else user.id
     payload = {
         "sub": str(user_id),
@@ -41,6 +47,11 @@ def create_token(user: User, *, token_type: str, expires_delta: timedelta) -> st
         "role": user.role.value if hasattr(user.role, "value") else str(user.role),
         "type": token_type,
         "exp": expires_at,
+        # Permite invalidar sesiones YA emitidas (force-logout de una
+        # clinica) sin esperar a que expiren solas: get_db()/refresh_token
+        # rechazan cualquier token con iat anterior a
+        # Tenant.sessions_invalidated_at.
+        "iat": int(issued_at.timestamp()),
         # uuid4, no timestamp con resolucion de segundo -- dos tokens del
         # mismo usuario/tipo emitidos en el mismo segundo antes colisionaban
         # en el mismo jti, asi que revocar uno (logout) revocaba el otro.

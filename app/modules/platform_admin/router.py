@@ -7,6 +7,7 @@ from jose import jwt
 from pydantic import BaseModel, Field, SecretStr
 from sqlalchemy.orm import sessionmaker
 
+from app.core.rate_limit import limiter
 from app.database import get_control_engine
 from app.dependencies.auth import ALGORITHM, SECRET_KEY, decode_token, verify_password
 from app.dependencies.platform_auth import (
@@ -85,7 +86,8 @@ def _issue_access_token(admin_id: str) -> str:
 
 
 @router.post("/login", response_model=PlatformAdminLoginResponse)
-def platform_admin_login(data: PlatformAdminLoginRequest, request: Request) -> PlatformAdminLoginResponse:
+@limiter.limit("5/minute")
+def platform_admin_login(request: Request, data: PlatformAdminLoginRequest) -> PlatformAdminLoginResponse:
     session_factory = sessionmaker(autocommit=False, autoflush=False, bind=get_control_engine())
     db = session_factory()
     try:
@@ -194,9 +196,10 @@ def platform_admin_2fa_setup_confirm(
 
 
 @router.post("/2fa/verify", response_model=PlatformAdminAccessTokenResponse)
+@limiter.limit("5/minute")
 def platform_admin_2fa_verify(
-    data: TotpCodeRequest,
     request: Request,
+    data: TotpCodeRequest,
     current_admin: PlatformAdmin = Depends(get_platform_admin_2fa_pending),
 ) -> PlatformAdminAccessTokenResponse:
     code = data.code.strip()

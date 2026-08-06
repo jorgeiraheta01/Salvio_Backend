@@ -49,14 +49,40 @@ CREATE TABLE IF NOT EXISTS `lab_tests_catalog` (
   UNIQUE KEY `test_code` (`test_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `cie10_catalog` (
+  `id` binary(16) NOT NULL DEFAULT (UUID_TO_BIN(UUID())),
+  `code` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `category` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_cie10_code` (`code`),
+  KEY `idx_cie10_description` (`description`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `tenants` (
   `id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `country` varchar(2) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `is_active` tinyint(1) NOT NULL,
+  `status` enum('active','suspended','archived') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `sessions_invalidated_at` datetime DEFAULT NULL,
+  `billing_contact_name` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `billing_contact_phone` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `tenant_module_flags` (
+  `id` binary(16) NOT NULL DEFAULT (UUID_TO_BIN(UUID())),
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `module_key` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_tenant_module` (`tenant_id`,`module_key`),
+  KEY `idx_tenant_module_flags_tenant` (`tenant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `facilities` (
@@ -151,12 +177,39 @@ CREATE TABLE IF NOT EXISTS `users` (
   `specialty` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL,
   `deleted_at` datetime DEFAULT NULL,
+  `last_login_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`),
   KEY `tenant_id` (`tenant_id`),
   CONSTRAINT `users_ibfk_1` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `doctor_weekly_hours` (
+  `id` binary(16) NOT NULL DEFAULT (UUID_TO_BIN(UUID())),
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `doctor_id` binary(16) NOT NULL,
+  `day_of_week` smallint NOT NULL,
+  `start_time` time NOT NULL,
+  `end_time` time NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_doctor_weekly_hours_doctor` (`tenant_id`,`doctor_id`,`day_of_week`),
+  CONSTRAINT `fk_doctor_weekly_hours_doctor` FOREIGN KEY (`doctor_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `doctor_absences` (
+  `id` binary(16) NOT NULL DEFAULT (UUID_TO_BIN(UUID())),
+  `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `doctor_id` binary(16) NOT NULL,
+  `start_date` date NOT NULL,
+  `end_date` date NOT NULL,
+  `reason` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_doctor_absences_doctor` (`tenant_id`,`doctor_id`,`start_date`,`end_date`),
+  CONSTRAINT `fk_doctor_absences_doctor` FOREIGN KEY (`doctor_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `appointments` (
@@ -1282,12 +1335,14 @@ CREATE TABLE IF NOT EXISTS `record_diagnoses` (
   `tenant_id` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `clinical_problem_id` binary(16) DEFAULT NULL,
   `cie10_code` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `cie10_description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `cie10_description` text COLLATE utf8mb4_unicode_ci NOT NULL,
   `diagnosis_type` enum('presumptive','definitive','ruled_out') COLLATE utf8mb4_unicode_ci NOT NULL,
   `is_first_time` tinyint(1) NOT NULL,
   `is_primary_diagnosis` tinyint(1) NOT NULL,
   `is_background` tinyint(1) NOT NULL,
   `is_outpatient` tinyint(1) NOT NULL,
+  `status` enum('active','resolved','chronic','recurrent') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `severity` enum('mild','moderate','severe') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `notes` text COLLATE utf8mb4_unicode_ci,
   `created_by` binary(16) DEFAULT NULL,
   `updated_by` binary(16) DEFAULT NULL,

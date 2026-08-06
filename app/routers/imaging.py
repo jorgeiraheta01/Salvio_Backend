@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies.auth import get_current_user, require_roles
 from app.dependencies.db import get_db
+from app.dependencies.module_gate import require_module
 from app.models.imaging import ImagingReport, ImagingStudy
 from app.models.tenant import User, UserRole
 from app.routers._utils import audit_mutation, commit_or_409, data_for_create, data_for_model, get_by_id_or_404, model_to_dict, uuid_bytes
@@ -14,7 +15,7 @@ from app.services.imaging_service import create_imaging_study as svc_create_imag
 from app.services.imaging_service import get_imaging_study as svc_get_imaging_study
 from app.services.imaging_service import update_imaging_status as svc_update_imaging_status
 
-router = APIRouter(prefix="/api/v1/imaging-studies", tags=["Imaging"])
+router = APIRouter(prefix="/api/v1/imaging-studies", tags=["Imaging"], dependencies=[Depends(require_module("operaciones"))])
 
 
 @router.post("", response_model=ImagingStudyRead, status_code=status.HTTP_201_CREATED)

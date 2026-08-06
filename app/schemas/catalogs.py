@@ -37,6 +37,28 @@ class MedicationCatalogRead(MedicationCatalogBase):
     created_at: datetime
 
 
+class Cie10CatalogBase(StrippedStringMixin, ORMModel):
+    code: str = Field(min_length=1, max_length=10)
+    description: str = Field(min_length=1, max_length=255)
+    category: str | None = Field(default=None, max_length=100)
+    is_active: bool = True
+
+
+class Cie10CatalogCreate(Cie10CatalogBase):
+    pass
+
+
+class Cie10CatalogUpdate(StrippedStringMixin, ORMModel):
+    description: str | None = Field(default=None, min_length=1, max_length=255)
+    category: str | None = Field(default=None, max_length=100)
+    is_active: bool | None = None
+
+
+class Cie10CatalogRead(Cie10CatalogBase):
+    id: UUID
+    created_at: datetime
+
+
 class LabTestCatalogBase(StrippedStringMixin, ORMModel):
     test_code: str = Field(min_length=1, max_length=20)
     test_name: str = Field(min_length=1, max_length=255)

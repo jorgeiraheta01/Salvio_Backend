@@ -93,7 +93,12 @@ def start_encounter(
         existing_query = existing_query.filter(Encounter.patient_id == patient.id)
     existing = existing_query.first()
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="There is already an active encounter for this context.")
+        # La busqueda ya esta acotada a current_user.id, asi que este "conflicto"
+        # nunca es un choque real con otro medico -- es siempre el mismo medico
+        # reabriendo su propio encuentro activo (ej. salio de la pantalla y volvio
+        # a darle a "Iniciar/reanudar consulta"). Devolver el existente en vez de
+        # 409 hace que el flujo sea idempotente.
+        return _encounter_read(db, existing, patient, current_user)
     encounter = Encounter(
         id=new_uuid_bytes(),
         appointment_id=appointment.id if appointment else None,

@@ -6,14 +6,16 @@ from sqlalchemy.orm import Session
 
 from app.dependencies.auth import get_current_user, require_roles
 from app.dependencies.db import get_db
+from app.dependencies.module_gate import require_module
 from app.models.appointment import Appointment, AppointmentStatus, PatientAdmission, TriageRecord
 from app.models.patient import Patient
 from app.models.tenant import User, UserRole
-from app.routers._utils import audit_mutation, commit_or_409, data_for_create, data_for_model, ensure_patient_exists, get_by_id_or_404, model_to_dict, uuid_bytes
+from app.routers._utils import audit_mutation, commit_or_409, data_for_create, data_for_model, ensure_patient_exists, get_by_id_or_404, local_day_utc_range, model_to_dict, uuid_bytes
 from app.schemas.appointment import (
     APPOINTMENT_STATUS_ORDER,
     AppointmentCreate,
     AppointmentRead,
+    AppointmentRescheduleRequest,
     AppointmentStatusUpdate,
     PatientAdmissionCreate,
     PatientAdmissionRead,
@@ -23,9 +25,10 @@ from app.schemas.appointment import (
 from app.services.appointment_service import create_admission as svc_create_admission
 from app.services.appointment_service import create_appointment as svc_create_appointment
 from app.services.appointment_service import create_triage as svc_create_triage
+from app.services.appointment_service import reschedule_appointment as svc_reschedule_appointment
 from app.services.appointment_service import update_appointment_status as svc_update_appointment_status
 
-router = APIRouter(prefix="/api/v1/appointments", tags=["Appointments"])
+router = APIRouter(prefix="/api/v1/appointments", tags=["Appointments"], dependencies=[Depends(require_module("agenda"))])
 APPOINTMENT_ROLES = (UserRole.clinic_admin, UserRole.doctor, UserRole.resident, UserRole.receptionist)
 
 
@@ -56,8 +59,9 @@ def list_appointments(
     if status_filter:
         query = query.filter(Appointment.status == status_filter)
     if date:
-        query = query.filter(Appointment.scheduled_at >= date, Appointment.scheduled_at < date_type.fromordinal(date.toordinal() + 1))
-    return query.order_by(Appointment.scheduled_at.desc()).all()
+        start_utc, end_utc = local_day_utc_range(date)
+        query = query.filter(Appointment.scheduled_at >= start_utc, Appointment.scheduled_at < end_utc)
+    return query.order_by(Appointment.scheduled_at.asc()).all()
 
 
 @router.patch("/{appointment_id}/status", response_model=AppointmentRead)
@@ -69,6 +73,25 @@ def update_appointment_status(
     current_user: User = Depends(require_roles(*APPOINTMENT_ROLES)),
 ):
     return svc_update_appointment_status(db, appointment_id.bytes, current_user.tenant_id, data.status.value, data.reason, current_user.id)
+
+
+@router.post("/{appointment_id}/reschedule", response_model=AppointmentRead, status_code=status.HTTP_201_CREATED)
+def reschedule_appointment(
+    appointment_id: UUID,
+    data: AppointmentRescheduleRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles(*APPOINTMENT_ROLES)),
+):
+    return svc_reschedule_appointment(
+        db,
+        appointment_id.bytes,
+        current_user.tenant_id,
+        data.new_scheduled_at,
+        data.new_doctor_id,
+        data.reason,
+        current_user.id,
+    )
 
 
 @router.delete("/{appointment_id}", status_code=status.HTTP_204_NO_CONTENT)

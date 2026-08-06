@@ -60,12 +60,12 @@ CREATE TABLE lab_tests_catalog (
 
 
 CREATE TABLE tenants (
-	id VARCHAR(50) NOT NULL, 
-	name VARCHAR(255) NOT NULL, 
-	country VARCHAR(2) NOT NULL, 
-	is_active BOOL NOT NULL, 
-	created_at DATETIME NOT NULL DEFAULT now(), 
-	updated_at DATETIME NOT NULL DEFAULT now(), 
+	id VARCHAR(50) NOT NULL,
+	name VARCHAR(255) NOT NULL,
+	country VARCHAR(2) NOT NULL,
+	status ENUM('active','suspended','archived') NOT NULL,
+	created_at DATETIME NOT NULL DEFAULT now(),
+	updated_at DATETIME NOT NULL DEFAULT now(),
 	PRIMARY KEY (id)
 )
 

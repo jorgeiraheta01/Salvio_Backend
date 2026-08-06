@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies.auth import get_current_user, require_roles
 from app.dependencies.db import get_db
+from app.dependencies.module_gate import require_module
 from app.models.billing import Billing, BillingItem, BillingStatus, Payment
 from app.models.tenant import User, UserRole
 from app.routers._utils import audit_mutation, commit_or_409, data_for_create, data_for_model, get_by_id_or_404, model_to_dict, uuid_bytes
@@ -15,7 +16,7 @@ from app.services.billing_service import create_billing as svc_create_billing
 from app.services.billing_service import register_payment as svc_register_payment
 from app.services.billing_service import update_billing as svc_update_billing
 
-router = APIRouter(prefix="/api/v1/billing", tags=["Billing"])
+router = APIRouter(prefix="/api/v1/billing", tags=["Billing"], dependencies=[Depends(require_module("operaciones"))])
 BILLING_ROLES = (UserRole.clinic_admin, UserRole.accountant, UserRole.receptionist)
 
 

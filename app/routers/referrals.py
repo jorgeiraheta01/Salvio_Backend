@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies.auth import get_current_user, require_roles
 from app.dependencies.db import get_db
+from app.dependencies.module_gate import require_module
 from app.models.appointment import AdmissionStatus, PatientAdmission
 from app.models.referral import Interconsult, PublicAccessToken, Referral, ReferralStatus, ReferralType
 from app.models.tenant import User, UserRole
@@ -15,7 +16,7 @@ from app.services.referral_service import accept_internal_transfer as svc_accept
 from app.services.referral_service import create_referral as svc_create_referral
 from app.services.referral_service import update_referral as svc_update_referral
 
-router = APIRouter(prefix="/api/v1/referrals", tags=["Referrals"])
+router = APIRouter(prefix="/api/v1/referrals", tags=["Referrals"], dependencies=[Depends(require_module("operaciones"))])
 
 
 @router.post("/interconsults", response_model=InterconsultRead, status_code=status.HTTP_201_CREATED)

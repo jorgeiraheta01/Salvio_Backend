@@ -15,8 +15,35 @@ class Tenant(Base):
     name = Column(String(255), nullable=False)
     country = Column(String(2), nullable=False, default="SV")
     status = Column(SQLEnum(TenantStatus), nullable=False, default=TenantStatus.active)
+    # Distinto de `status`: bloquear una clinica detiene logins NUEVOS pero un
+    # access token ya emitido seguia siendo valido hasta su expiracion natural
+    # (hasta 60 min por default). Este timestamp permite cortar sesiones YA
+    # activas de inmediato -- cualquier token con "iat" anterior a este valor
+    # se rechaza en get_db()/refresh_token, sin importar si sigue sin expirar.
+    sessions_invalidated_at = Column(DateTime, nullable=True)
+    # Contacto de facturacion de la clinica (a quien va dirigida la factura
+    # PDF que genera el dueno desde Facturacion -- ver PlatformCharge). No es
+    # necesariamente el clinic_admin: puede ser el dueno/administrador del
+    # negocio, que no siempre tiene cuenta de usuario en el sistema.
+    billing_contact_name = Column(String(255), nullable=True)
+    billing_contact_phone = Column(String(50), nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+
+class TenantModuleFlag(Base):
+    """Interruptor por modulo dentro de una clinica (distinto de
+    Tenant.status: bloquear apaga TODO el acceso, esto apaga solo un modulo
+    especifico -- ej. el cliente dejo de contratar Facturacion pero sigue
+    usando Agenda). No hay fila = modulo habilitado por defecto."""
+    __tablename__ = "tenant_module_flags"
+    id = Column(BINARY(16), primary_key=True, server_default="UUID_TO_BIN(UUID())")
+    tenant_id = Column(String(50), ForeignKey("tenants.id"), nullable=False)
+    module_key = Column(String(50), nullable=False)
+    enabled = Column(Boolean, nullable=False, default=True)
+    updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    __table_args__ = (
+        Index("uq_tenant_module", "tenant_id", "module_key", unique=True),
+    )
 
 class UserRole(str, enum.Enum):
     super_admin = "super_admin"
@@ -46,6 +73,11 @@ class User(Base):
     specialty = Column(String(255), nullable=True)
     is_active = Column(Boolean, nullable=False, default=True)
     deleted_at = Column(DateTime, nullable=True)
+    last_login_at = Column(DateTime, nullable=True)
+    # Analogo a Tenant.sessions_invalidated_at pero para UN usuario -- permite
+    # "cerrar sesion" de una sola persona del equipo sin afectar al resto de
+    # la clinica (distinto de force_tenant_logout, que es clinica completa).
+    sessions_invalidated_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     __table_args__ = (

@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import logging
 import os
-import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from jose import jwt
@@ -11,7 +10,9 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.database import DATABASE_URL, get_tenant_engine
+from app.core.rate_limit import limiter
+from app.database import DATABASE_URL, _reject_if_session_invalidated, get_tenant_engine
+from app.modules.tenants.service import _validate_tenant_id
 from app.dependencies.auth import (
     ALGORITHM,
     SECRET_KEY,
@@ -40,7 +41,6 @@ from app.utils.password import pwd_context
 from uuid import uuid4
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
-TENANT_ID_PATTERN = re.compile(r"^[a-z0-9_]+$")
 PASSWORD_RESET_EXPIRE_MINUTES = 30
 logger = logging.getLogger("salvio.auth")
 
@@ -59,13 +59,6 @@ class LoginRequest(BaseModel):
     tenant_id: str = Field(min_length=1, max_length=50, pattern=r"^[a-z0-9_]+$")
     email: str = Field(max_length=255, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
     password: SecretStr = Field(min_length=1, max_length=128)
-
-
-def _validate_tenant_id(tenant_id: str) -> str:
-    value = tenant_id.strip()
-    if not value or not TENANT_ID_PATTERN.fullmatch(value):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid tenant_id.")
-    return value
 
 
 def _tenant_db_name(tenant_id: str) -> str:
@@ -100,7 +93,8 @@ def _ensure_tenant_database_exists(tenant_id: str) -> None:
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(data: LoginRequest):
+@limiter.limit("5/minute")
+def login(request: Request, data: LoginRequest):
     tenant_id = _validate_tenant_id(data.tenant_id)
     _ensure_tenant_database_exists(tenant_id)
 
@@ -125,6 +119,9 @@ def login(data: LoginRequest):
         if TENANT_2FA_ENABLED:
             temp_token = create_token(user, token_type="2fa", expires_delta=__import__("datetime").timedelta(minutes=5))
             return LoginResponse(access_token="", refresh_token=None, requires_2fa=True, temp_token=temp_token)
+
+        user.last_login_at = datetime.now(timezone.utc)
+        db.commit()
 
         return LoginResponse(
             access_token=create_access_token(user),
@@ -162,6 +159,8 @@ def verify_2fa(data: TwoFAVerifyRequest):
         user, tenant_status = row
         if tenant_status is not None and tenant_status != TenantStatus.active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
+        user.last_login_at = datetime.now(timezone.utc)
+        db.commit()
         return TwoFAVerifyResponse(access_token=create_access_token(user), refresh_token=create_refresh_token(user), user=user)
     finally:
         db.close()
@@ -191,6 +190,7 @@ def refresh_token(data: RefreshTokenRequest):
         user, tenant_status = row
         if tenant_status is not None and tenant_status != TenantStatus.active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
+        _reject_if_session_invalidated(db, tenant_id, payload)
         return RefreshTokenResponse(access_token=create_access_token(user))
     finally:
         db.close()

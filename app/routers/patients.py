@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies.auth import get_current_user, require_roles
 from app.dependencies.db import get_db
+from app.dependencies.module_gate import require_module
 from app.models.development import PatientDevelopmentRecord
 from app.models.patient import (
     Patient,
@@ -80,7 +81,7 @@ from app.services.patient_service import search_patients as svc_search_patients
 from app.services.patient_service import soft_delete_patient as svc_soft_delete_patient
 from app.services.patient_service import update_patient as svc_update_patient
 
-router = APIRouter(prefix="/api/v1/patients", tags=["Patients"])
+router = APIRouter(prefix="/api/v1/patients", tags=["Patients"], dependencies=[Depends(require_module("pacientes"))])
 PATIENT_ROLES = (UserRole.clinic_admin, UserRole.doctor, UserRole.resident, UserRole.nurse, UserRole.receptionist)
 
 

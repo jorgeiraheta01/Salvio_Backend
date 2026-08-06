@@ -17,7 +17,8 @@ def _admin_token(api) -> str:
 def test_archive_blocked_by_open_appointment(api):
     token = _admin_token(api)
     doctor_id = get_doctor_id(api, token)
-    patient = create_test_patient(api, token, unique_seed=int(time.time() * 1000) % 10**8)
+    seed = int(time.time() * 1000) % 10**8
+    patient = create_test_patient(api, token, unique_seed=seed)
 
     appt = api.post(
         f"{BASE_URL}/api/v1/appointments",
@@ -25,7 +26,9 @@ def test_archive_blocked_by_open_appointment(api):
             "tenant_id": QA_TENANT,
             "patient_id": patient["id"],
             "doctor_id": doctor_id,
-            "scheduled_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            # offset por seed para no chocar (mismo medico, +/-30min bloquea)
+            # con citas que dejan otros tests/corridas previas en esta BD compartida
+            "scheduled_at": (datetime.now(timezone.utc) + timedelta(days=7, minutes=seed % 500)).isoformat(),
         },
         headers=auth_headers(token),
     )

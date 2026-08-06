@@ -59,7 +59,8 @@ def test_update_user_profile_fields(api):
 def test_deactivate_blocked_by_open_appointment_then_succeeds_when_clean(api):
     admin_token = _admin_token(api)
     doctor_id = get_doctor_id(api, admin_token)
-    patient = create_test_patient(api, admin_token, unique_seed=int(time.time() * 1000) % 10**8)
+    seed = int(time.time() * 1000) % 10**8
+    patient = create_test_patient(api, admin_token, unique_seed=seed)
 
     appt = api.post(
         f"{BASE_URL}/api/v1/appointments",
@@ -67,7 +68,9 @@ def test_deactivate_blocked_by_open_appointment_then_succeeds_when_clean(api):
             "tenant_id": QA_TENANT,
             "patient_id": patient["id"],
             "doctor_id": doctor_id,
-            "scheduled_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
+            # dia 8 (no 7, para no chocar con test_patient_lifecycle.py) +
+            # offset por seed, mismo motivo: BD compartida sin aislamiento
+            "scheduled_at": (datetime.now(timezone.utc) + timedelta(days=8, minutes=seed % 500)).isoformat(),
         },
         headers=auth_headers(admin_token),
     )

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.dependencies.auth import get_current_user, require_roles
 from app.dependencies.db import get_db
+from app.dependencies.module_gate import require_module
 from app.models.lab import LabOrder, LabOrderItem, LabResult
 from app.models.tenant import User, UserRole
 from app.routers._utils import audit_mutation, commit_or_409, data_for_create, data_for_model, get_by_id_or_404, model_to_dict, uuid_bytes
@@ -14,7 +15,7 @@ from app.services.lab_service import get_lab_order as svc_get_lab_order
 from app.services.lab_service import register_lab_result as svc_register_lab_result
 from app.services.lab_service import update_lab_order_status as svc_update_lab_order_status
 
-router = APIRouter(prefix="/api/v1/lab-orders", tags=["Lab"])
+router = APIRouter(prefix="/api/v1/lab-orders", tags=["Lab"], dependencies=[Depends(require_module("operaciones"))])
 
 
 @router.post("", response_model=LabOrderRead, status_code=status.HTTP_201_CREATED)

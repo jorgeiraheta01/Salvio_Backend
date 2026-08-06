@@ -22,7 +22,7 @@ def create_vital_sign(
     data: VitalSignCreate,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles(UserRole.doctor, UserRole.resident, UserRole.nurse)),
+    current_user: User = Depends(require_roles(UserRole.doctor, UserRole.resident, UserRole.nurse, UserRole.receptionist)),
 ):
     tenant_id = resolve_request_tenant(request, current_user)
     encounter = None
