@@ -44,7 +44,7 @@ def update_imaging_status(db: Session, study_id: bytes, tenant_id: str, data: Im
         if data.status not in IMAGING_ALLOWED_TRANSITIONS[study.status]:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Cannot transition imaging study from '{study.status.value}' to '{data.status.value}'",
+                detail=f"No se puede pasar el estudio de imagenologia de '{study.status.value}' a '{data.status.value}'",
             )
     old = model_to_dict(study)
     updates = data.model_dump(exclude_unset=True)

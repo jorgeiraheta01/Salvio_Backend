@@ -106,7 +106,7 @@ def platform_admin_login(request: Request, data: PlatformAdminLoginRequest) -> P
                 new_values={"email": data.email.strip().lower()},
             )
             db.commit()
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales invalidas.")
 
         admin_id = str(UUID(bytes=admin.id))
 
@@ -158,7 +158,7 @@ def platform_admin_2fa_setup_confirm(
 ) -> TotpSetupConfirmResponse:
     secret = totp_utils.decrypt_secret(current_admin.totp_secret_encrypted)
     if not totp_utils.verify_code(secret, data.code.strip()):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid code.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Codigo invalido.")
 
     session_factory = sessionmaker(autocommit=False, autoflush=False, bind=get_control_engine())
     db = session_factory()
@@ -265,7 +265,7 @@ def platform_admin_2fa_verify(
             new_values={"reason": "invalid_2fa_code"},
         )
         db.commit()
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid code.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Codigo invalido.")
     finally:
         db.close()
 
@@ -279,7 +279,7 @@ def platform_admin_logout(
     payload = decode_token(credentials.credentials)
     jti = payload.get("jti")
     if not jti:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Token has no jti.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="El token no tiene jti.")
 
     session_factory = sessionmaker(autocommit=False, autoflush=False, bind=get_control_engine())
     db = session_factory()

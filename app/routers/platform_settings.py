@@ -105,7 +105,7 @@ def update_announcement(announcement_id: UUID, data: AnnouncementUpdate, request
     try:
         result = svc_update_announcement(db, announcement_id.bytes, message=data.message, severity=data.severity, active=data.active)
         if not result:
-            raise HTTPException(status_code=404, detail="Announcement not found.")
+            raise HTTPException(status_code=404, detail="Anuncio no encontrado.")
         response = AnnouncementRead.model_validate(result)
         _log(db, current_admin, request, action="announcement_update", table_name="platform_announcements", record_id=announcement_id.bytes, new_values=data.model_dump(exclude_unset=True))
         return response
@@ -140,7 +140,7 @@ def update_feature_flag(flag_id: UUID, data: FeatureFlagUpdate, request: Request
     try:
         result = svc_update_feature_flag(db, flag_id.bytes, enabled=data.enabled, description=data.description)
         if not result:
-            raise HTTPException(status_code=404, detail="Feature flag not found.")
+            raise HTTPException(status_code=404, detail="Bandera de funcionalidad no encontrada.")
         response = FeatureFlagRead.model_validate(result)
         _log(db, current_admin, request, action="feature_flag_update", table_name="feature_flags", record_id=flag_id.bytes, new_values=data.model_dump(exclude_unset=True))
         return response

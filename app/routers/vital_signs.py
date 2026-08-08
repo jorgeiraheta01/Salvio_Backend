@@ -36,7 +36,7 @@ def create_vital_sign(
     if data.clinical_record_id:
         record = get_by_id_or_404(db, ClinicalRecord, data.clinical_record_id, tenant_id)
         if record.status == ClinicalRecordStatus.signed:
-            raise __import__("fastapi").HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Signed clinical records are immutable.")
+            raise __import__("fastapi").HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Los expedientes clinicos firmados son inmutables.")
     vital, _alert = svc_create_vital_sign(db, tenant_id, data, current_user.id)
     return vital
 
@@ -57,5 +57,5 @@ def list_vital_signs(
         ensure_patient_exists(db, Patient, patient_id, current_user.tenant_id)
         query = query.filter(VitalSign.patient_id == uuid_bytes(patient_id))
     else:
-        raise __import__("fastapi").HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="patient_id or encounter_id is required.")
+        raise __import__("fastapi").HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Se requiere patient_id o encounter_id.")
     return query.order_by(VitalSign.recorded_at.desc()).limit(limit).all()

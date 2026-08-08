@@ -57,6 +57,10 @@ class Referral(Base):
     referred_by = Column(BINARY(16), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     referred_by_name = Column(String(255), nullable=True)
     target_tenant_id = Column(String(50), nullable=True)
+    # Sin FK real: el medico destino vive en la base de otro tenant. Se
+    # capturan al elegirlo en el buscador de la red (ver /network-doctors).
+    target_doctor_id = Column(BINARY(16), nullable=True)
+    target_doctor_name = Column(String(255), nullable=True)
     status = Column(SQLEnum(ReferralStatus), nullable=False, default="pending")
     created_at = Column(DateTime, nullable=False, server_default=func.now())
 

@@ -50,7 +50,7 @@ class ClinicalRecordSignRequest(ORMModel):
     @model_validator(mode="after")
     def require_primary_diagnosis(self):
         if not self.has_primary_diagnosis:
-            raise ValueError("a signed clinical record requires one primary diagnosis.")
+            raise ValueError("un expediente clinico firmado requiere un diagnostico primario.")
         return self
 
 
@@ -88,7 +88,7 @@ class VitalSignBase(ORMModel):
     @model_validator(mode="after")
     def calculate_derived_fields(self):
         if self.patient_id is None and self.encounter_id is None and self.clinical_record_id is None:
-            raise ValueError("patient_id, encounter_id or clinical_record_id is required.")
+            raise ValueError("se requiere patient_id, encounter_id o clinical_record_id.")
         glasgow_parts = [self.glasgow_ocular, self.glasgow_verbal, self.glasgow_motor]
         if all(part is not None for part in glasgow_parts):
             self.glasgow_total = sum(glasgow_parts)  # type: ignore[arg-type]

@@ -22,7 +22,7 @@ def check_whatsapp_consent(db: Session, patient_id: bytes) -> bool:
 
 def enqueue_whatsapp_message(db: Session, tenant_id: str, data: WaMessageCreate, user_id: bytes) -> WaMessage:
     if not check_whatsapp_consent(db, data.patient_id.bytes):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Patient has not given WhatsApp consent")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El paciente no ha dado consentimiento para WhatsApp")
     message = WaMessage(**data_for_model(data, WaMessage, exclude={"has_whatsapp_consent"}, tenant_id=tenant_id))
     message.id = new_uuid_bytes()
     message.status = WaMessageStatus.pending

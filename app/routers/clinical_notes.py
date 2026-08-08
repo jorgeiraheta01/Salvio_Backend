@@ -69,12 +69,12 @@ def update_clinical_note(
     tenant_id = resolve_request_tenant(request, current_user)
     note = db.query(ClinicalNote).filter(ClinicalNote.id == note_id.bytes, ClinicalNote.tenant_id == tenant_id).first()
     if not note:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinical note not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nota clinica no encontrada.")
     encounter = get_encounter_or_404(db, note.encounter_id, tenant_id)
     ensure_encounter_owner(encounter, current_user)
     ensure_encounter_editable(encounter)
     if note.is_closed:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Closed clinical notes are immutable.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Las notas clinicas cerradas son inmutables.")
     ensure_version(data.version, note.version)
     old = model_to_dict(note)
     note.content = data.content
@@ -98,7 +98,7 @@ def close_clinical_note(
     tenant_id = resolve_request_tenant(request, current_user)
     note = db.query(ClinicalNote).filter(ClinicalNote.id == note_id.bytes, ClinicalNote.tenant_id == tenant_id).first()
     if not note:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinical note not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nota clinica no encontrada.")
     encounter = get_encounter_or_404(db, note.encounter_id, tenant_id)
     ensure_encounter_owner(encounter, current_user)
     ensure_encounter_editable(encounter)

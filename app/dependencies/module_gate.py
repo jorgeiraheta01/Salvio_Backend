@@ -31,6 +31,6 @@ def require_module(module_key: str):
             .first()
         )
         if flag is not None and not flag.enabled:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Module '{module_key}' is disabled for this clinic.")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"El modulo '{module_key}' esta deshabilitado para esta clinica.")
 
     return _dependency

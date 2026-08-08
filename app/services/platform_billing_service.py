@@ -69,14 +69,14 @@ def list_charges(db: Session, tenant_id: str | None) -> dict:
 def get_charge(db: Session, charge_id: UUID) -> PlatformCharge:
     charge = db.query(PlatformCharge).filter(PlatformCharge.id == charge_id.bytes).first()
     if charge is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Charge not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cobro no encontrado.")
     return charge
 
 
 def update_charge_status(db: Session, charge_id: UUID, new_status: ChargeStatus) -> dict:
     charge = db.query(PlatformCharge).filter(PlatformCharge.id == charge_id.bytes).first()
     if charge is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Charge not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cobro no encontrado.")
     charge.status = new_status
     charge.paid_at = datetime.now(timezone.utc) if new_status == ChargeStatus.paid else None
     db.commit()

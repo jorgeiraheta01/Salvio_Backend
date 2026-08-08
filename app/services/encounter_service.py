@@ -16,7 +16,7 @@ def resolve_request_tenant(request: Request, current_user: User) -> str:
     if not tenant_id:
         return current_user.tenant_id
     if tenant_id != current_user.tenant_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tenant context does not match the authenticated user.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El contexto de tenant no coincide con el usuario autenticado.")
     return tenant_id
 
 
@@ -27,25 +27,25 @@ def get_patient_or_404(db: Session, patient_id: bytes, tenant_id: str) -> Patien
         .first()
     )
     if not patient:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado.")
     return patient
 
 
 def get_encounter_or_404(db: Session, encounter_id: UUID | bytes, tenant_id: str) -> Encounter:
     encounter = db.query(Encounter).filter(Encounter.id == uuid_bytes(encounter_id), Encounter.tenant_id == tenant_id).first()
     if not encounter:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Encounter not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Encuentro no encontrado.")
     return encounter
 
 
 def ensure_encounter_owner(encounter: Encounter, current_user: User) -> None:
     if encounter.doctor_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the assigned doctor can modify this encounter.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo el medico asignado puede modificar este encuentro.")
 
 
 def ensure_encounter_editable(encounter: Encounter) -> None:
     if encounter.status == EncounterStatus.closed:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Closed encounters are immutable.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Los encuentros cerrados son inmutables.")
 
 
 def ensure_version(expected_version: int, current_version: int, message: str = "The record was updated by another session.") -> None:
@@ -60,9 +60,9 @@ def get_appointment_for_encounter(db: Session, appointment_id: UUID, tenant_id: 
         .first()
     )
     if not appointment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cita no encontrada.")
     if appointment.doctor_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="The appointment does not belong to the authenticated doctor.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La cita no pertenece al medico autenticado.")
     return appointment
 
 

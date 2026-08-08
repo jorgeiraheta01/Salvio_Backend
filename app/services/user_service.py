@@ -61,7 +61,7 @@ def deactivate_user(db: Session, user_id: bytes, tenant_id: str, actor_id: bytes
     if open_appointments:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Cannot deactivate: doctor has {open_appointments} future/open appointment(s).",
+            detail=f"No se puede desactivar: el medico tiene {open_appointments} cita(s) futura(s)/abierta(s).",
         )
 
     active_encounters = (
@@ -72,7 +72,7 @@ def deactivate_user(db: Session, user_id: bytes, tenant_id: str, actor_id: bytes
     if active_encounters:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Cannot deactivate: doctor has {active_encounters} active encounter(s).",
+            detail=f"No se puede desactivar: el medico tiene {active_encounters} encuentro(s) activo(s).",
         )
 
     old = model_to_dict(user)

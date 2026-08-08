@@ -119,7 +119,7 @@ def get_by_id_or_404(db: Session, model: Any, record_id: UUID, tenant_id: str, *
         query = query.filter(model.deleted_at.is_(None))
     obj = query.first()
     if not obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resource not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recurso no encontrado.")
     return obj
 
 
@@ -130,7 +130,7 @@ def ensure_patient_exists(db: Session, patient_model: Any, patient_id: UUID, ten
         .first()
     )
     if not patient:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Paciente no encontrado.")
     return patient
 
 

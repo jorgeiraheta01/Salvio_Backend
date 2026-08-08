@@ -45,7 +45,7 @@ def _validate_tenant_id(tenant_id: str) -> str:
     if not value or not TENANT_ID_PATTERN.fullmatch(value):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="tenant_id must contain only lowercase letters, numbers, and underscores.",
+            detail="tenant_id solo puede contener letras minusculas, numeros y guiones bajos.",
         )
     return value
 
@@ -64,7 +64,7 @@ def _schema_path() -> Path:
 
 def _master_database_url() -> URL:
     if not DATABASE_URL:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="DATABASE_URL is not configured.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="DATABASE_URL no esta configurada.")
     return make_url(DATABASE_URL)
 
 
@@ -100,7 +100,7 @@ def _run_schema(db_name: str) -> None:
     if not schema_file.exists():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Schema file not found: {schema_file}",
+            detail=f"No se encontro el archivo de esquema: {schema_file}",
         )
 
     tenant_engine = create_engine(_tenant_database_url(db_name), pool_pre_ping=True)
@@ -110,7 +110,7 @@ def _run_schema(db_name: str) -> None:
             for statement in _iter_sql_statements(schema_sql):
                 connection.execute(text(statement))
     except SQLAlchemyError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Schema execution failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo la ejecucion del esquema: {exc}") from exc
     finally:
         tenant_engine.dispose()
 
@@ -132,11 +132,11 @@ def _create_database(db_name: str) -> None:
             if exists:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Database '{db_name}' already exists.",
+                    detail=f"La base de datos '{db_name}' ya existe.",
                 )
             connection.execute(text(f"CREATE DATABASE IF NOT EXISTS `{db_name}`"))
     except SQLAlchemyError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Database creation failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo la creacion de la base de datos: {exc}") from exc
     finally:
         admin_engine.dispose()
 
@@ -160,13 +160,13 @@ def _seed_tenant_row_and_users(
 
         all_emails = [admin_email, *[doc["email"] for doc in doctors]]
         if len(all_emails) != len(set(all_emails)):
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Duplicate email in the provisioning request.")
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Correo duplicado en la solicitud de aprovisionamiento.")
 
         existing = db.query(User).filter(User.email.in_(all_emails), User.deleted_at.is_(None)).first()
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"User '{existing.email}' already exists in database '{db_name}'.",
+                detail=f"El usuario '{existing.email}' ya existe en la base de datos '{db_name}'.",
             )
 
         admin_user = User(
@@ -201,7 +201,7 @@ def _seed_tenant_row_and_users(
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"User creation failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo la creacion del usuario: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()
@@ -243,7 +243,7 @@ def create_tenant(
         raise
     except Exception as exc:
         _drop_database_if_exists(db_name)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Tenant provisioning failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo el aprovisionamiento de la clinica: {exc}") from exc
 
     return {
         "tenant_id": safe_tenant_id,
@@ -267,7 +267,7 @@ def list_tenants(include_archived: bool = False) -> list[dict]:
             rows = connection.execute(text("SHOW DATABASES LIKE 'salvio\\_%'")).fetchall()
         db_names = [row[0] for row in rows if row[0] not in _RESERVED_DB_NAMES]
     except SQLAlchemyError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Tenant listing failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo el listado de clinicas: {exc}") from exc
     finally:
         admin_engine.dispose()
 
@@ -322,7 +322,7 @@ def update_tenant(
     finally:
         admin_engine.dispose()
     if not exists:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinica no encontrada.")
 
     tenant_engine = create_engine(_tenant_database_url(db_name), pool_pre_ping=True)
     session_factory = sessionmaker(autocommit=False, autoflush=False, bind=tenant_engine)
@@ -330,7 +330,7 @@ def update_tenant(
     try:
         tenant = db.query(Tenant).filter(Tenant.id == safe_tenant_id).first()
         if tenant is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinica no encontrada.")
         if name is not None:
             tenant.name = name.strip()
         if status is not None:
@@ -366,7 +366,7 @@ def update_tenant(
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Tenant update failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo la actualizacion de la clinica: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()
@@ -382,7 +382,7 @@ def get_tenant_billing_info(tenant_id: str) -> dict:
     try:
         tenant = db.query(Tenant).filter(Tenant.id == safe_tenant_id).first()
         if tenant is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinica no encontrada.")
         return {
             "tenant_id": tenant.id,
             "name": tenant.name,
@@ -406,7 +406,7 @@ def force_tenant_logout(tenant_id: str) -> None:
     try:
         tenant = db.query(Tenant).filter(Tenant.id == safe_tenant_id).first()
         if tenant is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found.")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinica no encontrada.")
         tenant.sessions_invalidated_at = datetime.now(timezone.utc)
         db.commit()
     except HTTPException:
@@ -414,7 +414,7 @@ def force_tenant_logout(tenant_id: str) -> None:
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Force logout failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo el cierre de sesion forzado: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()
@@ -451,7 +451,7 @@ def tenant_technical_stats() -> list[dict]:
             ).bindparams(bindparam("db_names", expanding=True))
             stats_rows = connection.execute(stmt, {"db_names": db_names}).fetchall()
     except SQLAlchemyError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Technical metrics query failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo la consulta de metricas tecnicas: {exc}") from exc
     finally:
         admin_engine.dispose()
 
@@ -486,7 +486,7 @@ def tenant_table_breakdown(tenant_id: str) -> list[dict]:
         with admin_engine.connect() as connection:
             exists = connection.execute(text("SHOW DATABASES LIKE :db_name"), {"db_name": db_name}).scalar()
             if not exists:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found.")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinica no encontrada.")
 
             rows = connection.execute(
                 text(
@@ -505,7 +505,7 @@ def tenant_table_breakdown(tenant_id: str) -> list[dict]:
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Table breakdown query failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo la consulta de desglose por tabla: {exc}") from exc
     finally:
         admin_engine.dispose()
 
@@ -532,7 +532,7 @@ def tenant_dashboard_stats() -> dict:
             rows = connection.execute(text("SHOW DATABASES LIKE 'salvio\\_%'")).fetchall()
         db_names = [row[0] for row in rows if row[0] not in _RESERVED_DB_NAMES]
     except SQLAlchemyError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Dashboard aggregation failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo la agregacion del dashboard: {exc}") from exc
     finally:
         admin_engine.dispose()
 
@@ -656,7 +656,7 @@ def ensure_tenant_exists(tenant_id: str) -> str:
     finally:
         admin_engine.dispose()
     if not exists:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinica no encontrada.")
     return safe_tenant_id
 
 
@@ -671,7 +671,7 @@ def _tenant_engine_or_404(tenant_id: str):
     finally:
         admin_engine.dispose()
     if not exists:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinica no encontrada.")
 
     return safe_tenant_id, create_engine(_tenant_database_url(db_name), pool_pre_ping=True)
 
@@ -688,7 +688,7 @@ def list_tenant_modules(tenant_id: str) -> list[dict]:
             for key, label in TENANT_MODULES
         ]
     except SQLAlchemyError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Module listing failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo el listado de modulos: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()
@@ -696,7 +696,7 @@ def list_tenant_modules(tenant_id: str) -> list[dict]:
 
 def set_tenant_module(tenant_id: str, module_key: str, enabled: bool) -> dict:
     if module_key not in TENANT_MODULE_KEYS:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown module '{module_key}'.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Modulo desconocido '{module_key}'.")
 
     safe_tenant_id, tenant_engine = _tenant_engine_or_404(tenant_id)
     session_factory = sessionmaker(autocommit=False, autoflush=False, bind=tenant_engine)
@@ -717,7 +717,7 @@ def set_tenant_module(tenant_id: str, module_key: str, enabled: bool) -> dict:
         return {"module_key": module_key, "label": label, "enabled": enabled}
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Module update failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo la actualizacion del modulo: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()
@@ -741,9 +741,9 @@ def _validate_staff_role(role_value: str) -> UserRole:
     try:
         role = UserRole(role_value)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Unknown role '{role_value}'.") from None
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Rol desconocido '{role_value}'.") from None
     if role not in MANAGEABLE_STAFF_ROLES:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Role '{role_value}' is not manageable from this panel.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"El rol '{role_value}' no se puede administrar desde este panel.")
     return role
 
 
@@ -773,7 +773,7 @@ def list_tenant_staff(tenant_id: str, role: str | None = None) -> list[dict]:
         members = query.order_by(User.full_name).all()
         return [_staff_to_dict(member) for member in members]
     except SQLAlchemyError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Staff listing failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo el listado del equipo: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()
@@ -788,7 +788,7 @@ def create_tenant_staff(tenant_id: str, data: dict) -> dict:
         email = data["email"].strip().lower()
         existing = db.query(User).filter(User.email == email, User.deleted_at.is_(None)).first()
         if existing:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"User '{email}' already exists.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"El usuario '{email}' ya existe.")
 
         new_member = User(
             id=uuid4().bytes,
@@ -809,7 +809,7 @@ def create_tenant_staff(tenant_id: str, data: dict) -> dict:
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Staff creation failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo la creacion del miembro del equipo: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()
@@ -819,7 +819,7 @@ def _get_staff_member(db: Session, safe_tenant_id: str, user_id: str) -> User:
     try:
         user_uuid = UUID(user_id)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Invalid user id.") from exc
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Id de usuario invalido.") from exc
 
     member = (
         db.query(User)
@@ -832,7 +832,7 @@ def _get_staff_member(db: Session, safe_tenant_id: str, user_id: str) -> User:
         .first()
     )
     if member is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Staff member not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Miembro del equipo no encontrado.")
     return member
 
 
@@ -852,7 +852,7 @@ def update_tenant_staff(tenant_id: str, user_id: str, data: dict) -> dict:
             if new_email != member.email:
                 existing = db.query(User).filter(User.email == new_email, User.deleted_at.is_(None)).first()
                 if existing:
-                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"User '{new_email}' already exists.")
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"El usuario '{new_email}' ya existe.")
                 member.email = new_email
         if data.get("is_active") is not None:
             member.is_active = data["is_active"]
@@ -865,7 +865,7 @@ def update_tenant_staff(tenant_id: str, user_id: str, data: dict) -> dict:
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Staff update failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo la actualizacion del miembro del equipo: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()
@@ -885,7 +885,7 @@ def delete_tenant_staff(tenant_id: str, user_id: str) -> None:
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Staff deactivation failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo la desactivacion del miembro del equipo: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()
@@ -903,7 +903,7 @@ def _get_admin_member(db: Session, safe_tenant_id: str) -> User:
         .first()
     )
     if member is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Clinic admin not found.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Administrador de clinica no encontrado.")
     return member
 
 
@@ -938,7 +938,7 @@ def reset_tenant_admin_password(tenant_id: str) -> dict:
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Password reset failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo el restablecimiento de contrasena: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()
@@ -957,7 +957,7 @@ def force_tenant_admin_logout(tenant_id: str) -> None:
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Force logout failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo el cierre de sesion forzado: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()
@@ -990,7 +990,7 @@ def reset_tenant_staff_password(tenant_id: str, user_id: str) -> dict:
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Password reset failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo el restablecimiento de contrasena: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()
@@ -1011,7 +1011,7 @@ def force_staff_logout(tenant_id: str, user_id: str) -> None:
         raise
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Force logout failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo el cierre de sesion forzado: {exc}") from exc
     finally:
         db.close()
         tenant_engine.dispose()

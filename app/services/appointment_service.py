@@ -26,7 +26,7 @@ def _value(status_value) -> str:
 
 def validate_status_transition(current: str, new: str) -> None:
     if new not in ALLOWED_TRANSITIONS[current]:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Cannot transition appointment from '{current}' to '{new}'")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"No se puede pasar la cita de '{current}' a '{new}'")
 
 
 def create_appointment(db: Session, tenant_id: str, data: AppointmentCreate, user_id: bytes) -> Appointment:
@@ -54,7 +54,7 @@ def update_appointment_status(db: Session, appt_id: bytes, tenant_id: str, new_s
     current = _value(appointment.status)
     validate_status_transition(current, new_status)
     if new_status in {"cancelled", "no_show", "rescheduled"} and not reason:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="reason is required for this status")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Se requiere un motivo para este estado")
     old = model_to_dict(appointment)
     appointment.status = new_status
     audit(db, user_id=user_id, tenant_id=tenant_id, action="UPDATE", table_name="appointments", record_id=appointment.id, old_values=old, new_values=model_to_dict(appointment))

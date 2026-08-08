@@ -5,6 +5,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
+from sqlalchemy.dialects.mysql import BINARY
 from sqlalchemy.orm import Session
 
 from app.utils.audit import log_audit
@@ -71,9 +72,13 @@ def data_for_model(data: Any, model: Any, *, exclude: set[str] | None = None, te
         # the field's name — a name-based whitelist (endswith("_id") / hardcoded set)
         # missed columns like ordered_by/performed_by/uploaded_by/prescribed_by/etc,
         # leaving them as UUID objects that fail at INSERT time.
+        is_binary_column = isinstance(model.__table__.columns[key].type, BINARY)
         if isinstance(value, UUID):
             result[key] = uuid_bytes(value)
-        elif key != "tenant_id" and (key.endswith("_id") or key in {"id", "user_id", "record_id", "signed_by", "recorded_by", "created_by"}):
+        elif is_binary_column and (key.endswith("_id") or key in {"id", "user_id", "record_id", "signed_by", "recorded_by", "created_by"}):
+            # Name-based heuristic only applies to actual BINARY(16) columns --
+            # string columns that happen to end in "_id" (e.g. target_tenant_id,
+            # which holds a tenant slug, not a UUID) must pass through untouched.
             result[key] = uuid_bytes(value)
         else:
             result[key] = value

@@ -24,7 +24,7 @@ class BillingBase(StrippedStringMixin, ORMModel):
     @model_validator(mode="after")
     def validate_void_reason(self):
         if self.status == BillingStatus.void and not self.void_reason:
-            raise ValueError("void_reason is required when billing status is void.")
+            raise ValueError("se requiere void_reason cuando el estado de la factura es anulada.")
         return self
 
 
@@ -42,7 +42,7 @@ class BillingUpdate(StrippedStringMixin, ORMModel):
     @model_validator(mode="after")
     def validate_void_reason(self):
         if self.status == BillingStatus.void and not self.void_reason:
-            raise ValueError("void_reason is required when voiding a billing record.")
+            raise ValueError("se requiere void_reason para anular una factura.")
         return self
 
 
@@ -69,7 +69,7 @@ class BillingItemBase(StrippedStringMixin, ORMModel):
         if self.total_amount is None:
             self.total_amount = (self.quantity * self.unit_price) - self.discount_amount + self.tax_amount
         if self.total_amount < 0:
-            raise ValueError("total_amount cannot be negative.")
+            raise ValueError("total_amount no puede ser negativo.")
         return self
 
 

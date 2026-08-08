@@ -11,7 +11,7 @@ from app.services._utils import audit, commit_or_409, data_for_model, model_to_d
 
 def create_clinical_record(db: Session, tenant_id: str, data: ClinicalRecordCreate, doctor: User) -> ClinicalRecord:
     if doctor.role not in {UserRole.doctor, UserRole.resident}:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only doctors and residents can create clinical records.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo los medicos y residentes pueden crear expedientes clinicos.")
     payload = data_for_model(data, ClinicalRecord, tenant_id=tenant_id)
     payload["id"] = new_uuid_bytes()
     payload["status"] = ClinicalRecordStatus.draft
@@ -36,7 +36,7 @@ def get_clinical_record(db: Session, record_id: bytes, tenant_id: str) -> Clinic
 def update_clinical_record(db: Session, record_id: bytes, tenant_id: str, data: ClinicalRecordUpdate, user_id: bytes) -> ClinicalRecord:
     record = get_clinical_record(db, record_id, tenant_id)
     if record.status == ClinicalRecordStatus.signed:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Clinical record is immutable once signed (RN-21)")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El expediente clinico es inmutable una vez firmado (RN-21)")
     old = model_to_dict(record)
     update_payload = data_for_model(data, ClinicalRecord)
     update_payload.pop("id", None)  # data_for_model auto-generates an id for create paths; never apply it on update
@@ -55,12 +55,12 @@ def verify_primary_diagnosis(db: Session, clinical_record_id: bytes) -> bool:
 
 def sign_clinical_record(db: Session, record_id: bytes, tenant_id: str, signature: str, doctor: User) -> ClinicalRecord:
     if doctor.role != UserRole.doctor:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only doctors can sign clinical records")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solo los medicos pueden firmar expedientes clinicos")
     record = get_clinical_record(db, record_id, tenant_id)
     if record.status == ClinicalRecordStatus.signed:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Clinical record is already signed.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El expediente clinico ya esta firmado.")
     if not verify_primary_diagnosis(db, record.id):
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Signing requires exactly one primary diagnosis (RN-24)")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Firmar requiere exactamente un diagnostico primario (RN-24)")
     old = model_to_dict(record)
     record.status = ClinicalRecordStatus.signed
     record.signed_at = datetime.now(timezone.utc)

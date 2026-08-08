@@ -87,7 +87,7 @@ class PrescriptionCreate(PrescriptionBase):
     @model_validator(mode="after")
     def flag_known_allergies(self):
         if self.patient_id is None and self.encounter_id is None:
-            raise ValueError("patient_id or encounter_id is required.")
+            raise ValueError("se requiere patient_id o encounter_id.")
         if self.known_allergy_alerts:
             for item in self.medications:
                 item.status = PrescriptionItemStatus.suspended

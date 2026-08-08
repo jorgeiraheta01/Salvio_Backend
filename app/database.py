@@ -74,7 +74,7 @@ def _reject_if_session_invalidated(db: Session, tenant_id: str, payload: dict) -
 
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if tenant is not None and _cutoff_rejects(issued_at, tenant.sessions_invalidated_at):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session revoked. Please sign in again.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sesion revocada. Inicia sesion de nuevo.")
 
     user_id = payload.get("sub")
     if user_id:
@@ -84,7 +84,7 @@ def _reject_if_session_invalidated(db: Session, tenant_id: str, payload: dict) -
             return
         user = db.query(User).filter(User.id == user_bytes, User.tenant_id == tenant_id).first()
         if user is not None and _cutoff_rejects(issued_at, user.sessions_invalidated_at):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session revoked. Please sign in again.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sesion revocada. Inicia sesion de nuevo.")
 
 
 def get_db(credentials: HTTPAuthorizationCredentials | None = Depends(_tenant_bearer)):
@@ -93,15 +93,15 @@ def get_db(credentials: HTTPAuthorizationCredentials | None = Depends(_tenant_be
     never from a client-suppliable header, so a request always lands in its own
     tenant's database and can never be pointed at another tenant's data."""
     if credentials is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado.")
     try:
         payload = jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
     except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token.") from None
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido o expirado.") from None
 
     tenant_id = payload.get("tenant_id")
     if not tenant_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido.")
 
     session_factory = sessionmaker(autocommit=False, autoflush=False, bind=get_tenant_engine(tenant_id))
     db: Session = session_factory()

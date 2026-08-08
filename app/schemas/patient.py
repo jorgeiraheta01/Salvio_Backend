@@ -61,9 +61,9 @@ class PatientBase(StrippedStringMixin, ORMModel):
     def validate_business_rules(self):
         age = patient_age_years(self.date_of_birth)
         if age >= 18 and not self.dui:
-            raise ValueError("dui is required for adult patients.")
+            raise ValueError("el dui es obligatorio para pacientes adultos.")
         if self.insurance_type in SOCIAL_INSURANCE_TYPES and not self.insurance_number:
-            raise ValueError("insurance_number is required for social insurance patients.")
+            raise ValueError("insurance_number es obligatorio para pacientes con seguro social.")
         if age >= 65:
             missing = [
                 name
@@ -71,7 +71,7 @@ class PatientBase(StrippedStringMixin, ORMModel):
                 if not getattr(self, name)
             ]
             if missing:
-                raise ValueError("emergency contact name, phone and relationship are required for patients 65 or older.")
+                raise ValueError("nombre, telefono y parentesco del contacto de emergencia son obligatorios para pacientes de 65 anos o mas.")
         return self
 
 
@@ -105,12 +105,13 @@ class PatientUpdate(StrippedStringMixin, ORMModel):
     @model_validator(mode="after")
     def validate_conditional_update(self):
         if self.insurance_type in SOCIAL_INSURANCE_TYPES and not self.insurance_number:
-            raise ValueError("insurance_number is required when updating to a social insurance type.")
+            raise ValueError("insurance_number es obligatorio al cambiar a un tipo de seguro social.")
         return self
 
 
 class PatientRead(PatientBase, TimestampMixin, SoftDeleteMixin):
     id: UUID
+    is_referred: bool = False
 
 
 class PatientAllergyBase(StrippedStringMixin, ORMModel):

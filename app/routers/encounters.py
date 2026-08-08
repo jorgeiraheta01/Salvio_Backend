@@ -76,10 +76,10 @@ def start_encounter(
         appointment = get_appointment_for_encounter(db, data.appointment_id, tenant_id, current_user)
         patient = get_patient_or_404(db, appointment.patient_id, tenant_id)
         if data.patient_id and data.patient_id.bytes != appointment.patient_id:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="patient_id does not match appointment patient.")
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="patient_id no coincide con el paciente de la cita.")
     else:
         if data.patient_id is None:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="patient_id is required when appointment_id is not provided.")
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Se requiere patient_id cuando no se envia appointment_id.")
         patient = get_patient_or_404(db, data.patient_id.bytes, tenant_id)
 
     existing_query = db.query(Encounter).filter(
@@ -152,7 +152,7 @@ def get_encounter(
     patient = db.query(Patient).filter(Patient.id == encounter.patient_id, Patient.tenant_id == current_user.tenant_id).first()
     doctor = db.query(User).filter(User.id == encounter.doctor_id, User.tenant_id == current_user.tenant_id).first()
     if not patient or not doctor:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Encounter references unavailable actors.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El encuentro hace referencia a datos no disponibles.")
     return _encounter_read(db, encounter, patient, doctor)
 
 
@@ -171,9 +171,9 @@ def close_encounter(
     diagnosis_count = db.query(func.count(RecordDiagnosis.id)).filter(RecordDiagnosis.encounter_id == encounter.id, RecordDiagnosis.tenant_id == tenant_id).scalar() or 0
     closed_note_count = db.query(func.count(ClinicalNote.id)).filter(ClinicalNote.encounter_id == encounter.id, ClinicalNote.tenant_id == tenant_id, ClinicalNote.is_closed.is_(True)).scalar() or 0
     if diagnosis_count < 1:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Cannot close the encounter without at least one diagnosis.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No se puede cerrar el encuentro sin al menos un diagnostico.")
     if closed_note_count < 1:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Cannot close the encounter without a closed clinical note.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No se puede cerrar el encuentro sin una nota clinica cerrada.")
     old = model_to_dict(encounter)
     encounter.status = EncounterStatus.closed
     encounter.closed_at = datetime.now(timezone.utc)

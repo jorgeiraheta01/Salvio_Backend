@@ -72,7 +72,7 @@ def decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token.") from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido o expirado.") from exc
 
 
 def get_current_user(
@@ -83,12 +83,12 @@ def get_current_user(
     payload = decode_token(token)
     jti = payload.get("jti")
     if jti and db.query(RevokedToken).filter(RevokedToken.jti == jti).first():
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="El token ha sido revocado.")
 
     user_id = payload.get("sub")
     tenant_id = payload.get("tenant_id")
     if not user_id or not tenant_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido.")
 
     tenant_session_factory = sessionmaker(autocommit=False, autoflush=False, bind=get_tenant_engine(tenant_id))
     tenant_db: Session = tenant_session_factory()
@@ -109,15 +109,15 @@ def get_current_user(
         tenant_db.close()
 
     if not row:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado o inactivo.")
     user, tenant_status = row
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado o inactivo.")
     # Grupo B: tanto "suspended" como "archived" cortan la sesion igual que
     # antes lo hacia is_active=False (H-09) -- solo el listado del owner
     # distingue entre ambos (archived se oculta por defecto).
     if tenant_status is not None and tenant_status != TenantStatus.active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Esta clinica ha sido desactivada.")
     return user
 
 
@@ -129,7 +129,7 @@ def require_roles(*roles: UserRole):
         if not isinstance(user_role, UserRole):
             user_role = UserRole(user_role)
         if user_role not in allowed:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient role permissions.")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permisos suficientes para esta accion.")
         return current_user
 
     return dependency

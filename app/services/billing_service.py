@@ -58,7 +58,7 @@ def register_payment(db: Session, billing_id: bytes, tenant_id: str, data: Payme
     if not billing:
         raise not_found("Billing not found.")
     if billing.status == BillingStatus.void:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cannot pay a voided billing")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se puede pagar una factura anulada.")
     old_billing = model_to_dict(billing)
     payment = Payment(**data_for_model(data, Payment, tenant_id=tenant_id))
     payment.id = new_uuid_bytes()
@@ -94,7 +94,7 @@ def update_billing(db: Session, billing_id: bytes, tenant_id: str, data: Billing
         if data.status not in BILLING_ALLOWED_TRANSITIONS[billing.status]:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Cannot transition billing from '{billing.status.value}' to '{data.status.value}'",
+                detail=f"No se puede pasar la factura de '{billing.status.value}' a '{data.status.value}'",
             )
 
     old = model_to_dict(billing)

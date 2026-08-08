@@ -89,6 +89,10 @@ class Patient(Base):
     last_occupation = Column(String(200), nullable=True)
     last_contribution_period = Column(String(50), nullable=True)
     last_work_date = Column(Date, nullable=True)
+    # True cuando el registro se creo por una referencia cross-tenant (ver
+    # POST /referrals/cross-tenant/{id}/import-patient) -- explicito en vez
+    # de inferirlo del prefijo "REF-" en medical_record_number.
+    is_referred = Column(Boolean, nullable=False, default=False)
     deleted_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())

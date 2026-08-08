@@ -48,9 +48,9 @@ class AppointmentStatusUpdate(ORMModel):
     def validate_forward_status(self):
         if self.current_status is not None:
             if APPOINTMENT_STATUS_ORDER[self.status] < APPOINTMENT_STATUS_ORDER[self.current_status]:
-                raise ValueError("appointment status cannot move backwards.")
+                raise ValueError("el estado de la cita no puede retroceder.")
         if self.status in {AppointmentStatus.cancelled, AppointmentStatus.no_show, AppointmentStatus.rescheduled} and not self.reason:
-            raise ValueError("reason is required for cancelled, no_show or rescheduled appointments.")
+            raise ValueError("el motivo es obligatorio para citas canceladas, no presentadas o reprogramadas.")
         return self
 
 

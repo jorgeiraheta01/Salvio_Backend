@@ -24,7 +24,7 @@ def create_prescription(db: Session, tenant_id: str, data: PrescriptionCreate, d
     medication_names = [item.medication_name for item in data.medications]
     for item in data.medications:
         if not item.dose or not item.frequency or not item.route:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Each prescription item requires dose, frequency and route.")
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Cada medicamento de la receta requiere dosis, frecuencia y via.")
     allergy_alerts = check_allergy_alert(db, patient_id, medication_names)
     status_value = PrescriptionStatus.pending_override if allergy_alerts else PrescriptionStatus.active
     payload = data_for_model(data, Prescription, exclude={"medications", "known_allergy_alerts"}, tenant_id=tenant_id)
@@ -54,7 +54,7 @@ def override_allergy(db: Session, prescription_id: bytes, tenant_id: str, data: 
     if not prescription:
         raise not_found("Prescription not found.")
     if prescription.status != PrescriptionStatus.pending_override:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Prescription is not pending an allergy override")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La receta no esta pendiente de una anulacion por alergia")
     old = model_to_dict(prescription)
     prescription.status = PrescriptionStatus.active
     prescription.updated_by = user_id

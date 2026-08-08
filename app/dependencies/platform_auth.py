@@ -16,11 +16,11 @@ def get_current_platform_admin(
 ) -> PlatformAdmin:
     payload = decode_token(credentials.credentials)
     if payload.get("type") != "platform_admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Platform admin access required.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Se requiere acceso de administrador de plataforma.")
 
     admin_id = payload.get("sub")
     if not admin_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido.")
 
     jti = payload.get("jti")
 
@@ -28,13 +28,13 @@ def get_current_platform_admin(
     db: Session = session_factory()
     try:
         if jti and db.query(ControlRevokedToken).filter(ControlRevokedToken.jti == jti).first():
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="El token ha sido revocado.")
         admin = db.query(PlatformAdmin).filter(PlatformAdmin.id == UUID(admin_id).bytes).first()
     finally:
         db.close()
 
     if not admin or not admin.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Platform admin not found or inactive.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Administrador de plataforma no encontrado o inactivo.")
     return admin
 
 
@@ -54,11 +54,11 @@ def _admin_from_scoped_token(credentials: HTTPAuthorizationCredentials, expected
     access_token real, y su vida es de minutos)."""
     payload = decode_token(credentials.credentials)
     if payload.get("type") != expected_type:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid token scope.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Alcance de token invalido.")
 
     admin_id = payload.get("sub")
     if not admin_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido.")
 
     session_factory = sessionmaker(autocommit=False, autoflush=False, bind=get_control_engine())
     db: Session = session_factory()
@@ -68,7 +68,7 @@ def _admin_from_scoped_token(credentials: HTTPAuthorizationCredentials, expected
         db.close()
 
     if not admin or not admin.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Platform admin not found or inactive.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Administrador de plataforma no encontrado o inactivo.")
     return admin
 
 

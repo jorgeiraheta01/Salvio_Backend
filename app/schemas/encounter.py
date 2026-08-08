@@ -17,7 +17,7 @@ class EncounterStartRequest(ORMModel):
     @model_validator(mode="after")
     def require_patient_or_appointment(self):
         if self.patient_id is None and self.appointment_id is None:
-            raise ValueError("patient_id or appointment_id is required")
+            raise ValueError("se requiere patient_id o appointment_id")
         return self
 
 

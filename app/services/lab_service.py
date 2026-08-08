@@ -56,7 +56,7 @@ def update_lab_order_status(db: Session, order_id: bytes, tenant_id: str, data: 
         if data.status not in LAB_ALLOWED_TRANSITIONS[order.status]:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Cannot transition lab order from '{order.status.value}' to '{data.status.value}'",
+                detail=f"No se puede pasar la orden de laboratorio de '{order.status.value}' a '{data.status.value}'",
             )
     old = model_to_dict(order)
     updates = data.model_dump(exclude_unset=True)

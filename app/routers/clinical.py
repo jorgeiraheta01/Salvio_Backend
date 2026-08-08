@@ -67,7 +67,7 @@ def _record_or_404(db: Session, record_id: UUID, tenant_id: str) -> ClinicalReco
 
 def _ensure_draft(record: ClinicalRecord) -> None:
     if record.status == ClinicalRecordStatus.signed:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Signed clinical records are immutable.")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Los expedientes clinicos firmados son inmutables.")
 
 
 def _detail(db: Session, record: ClinicalRecord) -> dict[str, Any]:
@@ -223,7 +223,7 @@ def create_record_diagnosis(
             .first()
         )
         if existing_primary:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only one primary diagnosis is allowed per clinical record.")
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Solo se permite un diagnostico primario por expediente clinico.")
     return _create_record_child(db, request, current_user, record_id, RecordDiagnosis, data)
 
 

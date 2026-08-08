@@ -67,13 +67,13 @@ def _tenant_db_name(tenant_id: str) -> str:
 
 def _server_database_url() -> str:
     if not DATABASE_URL:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="DATABASE_URL is not configured.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="DATABASE_URL no esta configurada.")
     return make_url(DATABASE_URL).set(database=None).render_as_string(hide_password=False)
 
 
 def _tenant_database_url(tenant_id: str) -> str:
     if not DATABASE_URL:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="DATABASE_URL is not configured.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="DATABASE_URL no esta configurada.")
     return make_url(DATABASE_URL).set(database=_tenant_db_name(tenant_id)).render_as_string(hide_password=False)
 
 
@@ -87,7 +87,7 @@ def _ensure_tenant_database_exists(tenant_id: str) -> None:
     except HTTPException:
         raise
     except SQLAlchemyError as exc:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Tenant lookup failed: {exc}") from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo la busqueda de la clinica: {exc}") from exc
     finally:
         engine.dispose()
 
@@ -104,7 +104,7 @@ def login(request: Request, data: LoginRequest):
     try:
         tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
         if tenant is not None and tenant.status != TenantStatus.active:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Esta clinica ha sido desactivada.")
 
         user = (
             db.query(User)
@@ -112,9 +112,9 @@ def login(request: Request, data: LoginRequest):
             .first()
         )
         if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales invalidas.")
         if not user.is_active or not verify_password(data.password.get_secret_value(), user.hashed_password):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales invalidas.")
 
         if TENANT_2FA_ENABLED:
             temp_token = create_token(user, token_type="2fa", expires_delta=__import__("datetime").timedelta(minutes=5))
@@ -142,10 +142,10 @@ def _tenant_session(tenant_id: str) -> Session:
 def verify_2fa(data: TwoFAVerifyRequest):
     payload = decode_token(data.temp_token)
     if payload.get("type") != "2fa":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid 2FA token.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de 2FA invalido.")
     tenant_id = payload.get("tenant_id")
     if not tenant_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido.")
     db = _tenant_session(tenant_id)
     try:
         row = (
@@ -155,10 +155,10 @@ def verify_2fa(data: TwoFAVerifyRequest):
             .first()
         )
         if not row or not row[0].is_active:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado o inactivo.")
         user, tenant_status = row
         if tenant_status is not None and tenant_status != TenantStatus.active:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Esta clinica ha sido desactivada.")
         user.last_login_at = datetime.now(timezone.utc)
         db.commit()
         return TwoFAVerifyResponse(access_token=create_access_token(user), refresh_token=create_refresh_token(user), user=user)
@@ -170,10 +170,10 @@ def verify_2fa(data: TwoFAVerifyRequest):
 def refresh_token(data: RefreshTokenRequest):
     payload = decode_token(data.refresh_token)
     if payload.get("type") != "refresh":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de actualizacion invalido.")
     tenant_id = payload.get("tenant_id")
     if not tenant_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido.")
     db = _tenant_session(tenant_id)
     try:
         # H-09: a clinic deactivated after the refresh token was issued must not
@@ -186,10 +186,10 @@ def refresh_token(data: RefreshTokenRequest):
             .first()
         )
         if not row or not row[0].is_active:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado o inactivo.")
         user, tenant_status = row
         if tenant_status is not None and tenant_status != TenantStatus.active:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This clinic has been deactivated.")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Esta clinica ha sido desactivada.")
         _reject_if_session_invalidated(db, tenant_id, payload)
         return RefreshTokenResponse(access_token=create_access_token(user))
     finally:
@@ -207,7 +207,7 @@ def logout(
     jti = payload.get("jti")
     exp = payload.get("exp")
     if not jti:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Refresh token has no jti.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="El token de actualizacion no tiene jti.")
     if not db.query(RevokedToken).filter(RevokedToken.jti == jti).first():
         db.add(
             RevokedToken(
@@ -264,20 +264,20 @@ def request_password_reset(data: PasswordResetRequest):
 def confirm_password_reset(data: PasswordResetConfirm):
     payload = decode_token(data.reset_token)
     if payload.get("type") != "password_reset":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired reset token.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de restablecimiento invalido o expirado.")
     tenant_id = payload.get("tenant_id")
     user_id = payload.get("sub")
     if not tenant_id or not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido.")
 
     jti = payload.get("jti")
     db = _tenant_session(tenant_id)
     try:
         if jti and db.query(RevokedToken).filter(RevokedToken.jti == jti).first():
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="This reset link has already been used.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Este enlace de restablecimiento ya fue utilizado.")
         user = db.query(User).filter(User.id == __import__("uuid").UUID(user_id).bytes, User.tenant_id == tenant_id, User.deleted_at.is_(None)).first()
         if not user or not user.is_active:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired reset token.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de restablecimiento invalido o expirado.")
         user.hashed_password = pwd_context.hash(data.new_password.get_secret_value())
         db.add(
             RevokedToken(

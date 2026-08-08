@@ -83,7 +83,7 @@ def create_diagnosis(
             .first()
         )
         if existing_primary:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only one primary diagnosis is allowed per encounter.")
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Solo se permite un diagnostico primario por encuentro.")
     diagnosis = RecordDiagnosis(
         id=new_uuid_bytes(),
         encounter_id=encounter.id,
@@ -146,7 +146,7 @@ def update_diagnosis(
                 .first()
             )
             if existing_primary:
-                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Only one primary diagnosis is allowed per encounter.")
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Solo se permite un diagnostico primario por encuentro.")
         diagnosis.is_primary_diagnosis = is_primary
         diagnosis.is_background = is_background
     if "type" in payload:

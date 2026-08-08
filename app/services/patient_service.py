@@ -40,7 +40,7 @@ def create_patient(db: Session, tenant_id: str, data: PatientCreate, user_id: by
     if data.dui:
         duplicate = db.query(Patient).filter(Patient.tenant_id == tenant_id, Patient.dui == data.dui).first()
         if duplicate:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A patient with this DUI already exists in this tenant.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ya existe un paciente con este DUI en esta clinica.")
     payload = data_for_model(data, Patient, tenant_id=tenant_id)
     payload["id"] = new_uuid_bytes()
     payload["medical_record_number"] = generate_mrn(db, tenant_id)
@@ -63,13 +63,13 @@ def get_patient(db: Session, patient_id: bytes, tenant_id: str) -> Patient:
 def update_patient(db: Session, patient_id: bytes, tenant_id: str, data: PatientUpdate, user_id: bytes) -> Patient:
     payload = data.model_dump(exclude_unset=True)
     if "tenant_id" in payload or "medical_record_number" in payload:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="tenant_id and medical_record_number cannot be changed.")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="tenant_id y medical_record_number no se pueden modificar.")
     patient = get_patient(db, patient_id, tenant_id)
     old = model_to_dict(patient)
     if "dui" in payload and payload["dui"]:
         duplicate = db.query(Patient).filter(Patient.tenant_id == tenant_id, Patient.dui == payload["dui"], Patient.id != patient_id).first()
         if duplicate:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A patient with this DUI already exists in this tenant.")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ya existe un paciente con este DUI en esta clinica.")
     update_payload = data_for_model(data, Patient)
     update_payload.pop("id", None)  # data_for_model auto-generates an id for create paths; never apply it on update
     for key, value in update_payload.items():
@@ -95,19 +95,19 @@ def soft_delete_patient(db: Session, patient_id: bytes, tenant_id: str, user_id:
         .count()
     )
     if open_appointments:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Cannot archive: patient has {open_appointments} future/open appointment(s).")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"No se puede archivar: el paciente tiene {open_appointments} cita(s) futura(s)/abierta(s).")
 
     active_encounters = (
         db.query(Encounter).filter(Encounter.patient_id == patient_id, Encounter.tenant_id == tenant_id, Encounter.status == EncounterStatus.active).count()
     )
     if active_encounters:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Cannot archive: patient has {active_encounters} active encounter(s).")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"No se puede archivar: el paciente tiene {active_encounters} encuentro(s) activo(s).")
 
     pending_billing = (
         db.query(Billing).filter(Billing.patient_id == patient_id, Billing.tenant_id == tenant_id, Billing.status == BillingStatus.pending).count()
     )
     if pending_billing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Cannot archive: patient has {pending_billing} pending billing record(s).")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"No se puede archivar: el paciente tiene {pending_billing} factura(s) pendiente(s).")
 
     old = model_to_dict(patient)
     patient.deleted_at = datetime.now(timezone.utc)

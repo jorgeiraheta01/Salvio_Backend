@@ -21,9 +21,9 @@ class WaMessageBase(StrippedStringMixin, ORMModel):
     @model_validator(mode="after")
     def require_consent(self):
         if not self.has_whatsapp_consent:
-            raise ValueError("explicit patient consent is required before sending WhatsApp messages.")
+            raise ValueError("se requiere consentimiento explicito del paciente antes de enviar mensajes de WhatsApp.")
         if self.status == WaMessageStatus.failed and not self.error_message:
-            raise ValueError("error_message is required when WhatsApp status is failed.")
+            raise ValueError("error_message es obligatorio cuando el estado de WhatsApp es fallido.")
         return self
 
 
@@ -39,7 +39,7 @@ class WaMessageUpdate(StrippedStringMixin, ORMModel):
     @model_validator(mode="after")
     def require_error_on_failed(self):
         if self.status == WaMessageStatus.failed and not self.error_message:
-            raise ValueError("error_message is required when WhatsApp status is failed.")
+            raise ValueError("error_message es obligatorio cuando el estado de WhatsApp es fallido.")
         return self
 
 

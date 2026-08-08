@@ -19,7 +19,7 @@ def authenticate_user(db: Session, email: str, password: str) -> User | None:
     if not user:
         return None
     if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="El usuario esta inactivo.")
     try:
         valid = pwd_context.verify(normalize_password(password), user.hashed_password)
     except Exception:
@@ -63,10 +63,10 @@ def verify_token(token: str, db: Session) -> dict:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token.") from exc
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token invalido o expirado.") from exc
     jti = payload.get("jti")
     if jti and db.query(RevokedToken).filter(RevokedToken.jti == jti).first():
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="El token ha sido revocado.")
     return payload
 
 
