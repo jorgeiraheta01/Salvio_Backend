@@ -37,26 +37,38 @@ Uso:
 """
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
 
 import pymysql
+from dotenv import load_dotenv
+from sqlalchemy.engine import make_url
+
+load_dotenv()
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS_DIR = ROOT / "sql" / "migrations"
 
-# TODO: leer de .env en vez de hardcodear -- por ahora coincide con el resto
-# de scripts de esta sesion (docker-compose local).
-DB_HOST = "127.0.0.1"
-DB_USER = "root"
-DB_PASSWORD = "rootroot"
+# Lee la conexion de DATABASE_URL (misma variable que usa el resto de la app,
+# ver app/database.py) en vez de hardcodear host/user/password de docker-compose
+# local -- necesario para correr este runner contra la BD de Railway.
+_DATABASE_URL = os.getenv("DATABASE_URL")
+if not _DATABASE_URL:
+    raise SystemExit("DATABASE_URL no esta configurada (revisa tu .env o las env vars del entorno).")
+
+_url = make_url(_DATABASE_URL)
+DB_HOST = _url.host
+DB_PORT = _url.port or 3306
+DB_USER = _url.username
+DB_PASSWORD = _url.password
 
 RESERVED_DB_NAMES = {"salvio_control"}
 
 
 def connect(database: str | None = None):
-    return pymysql.connect(host=DB_HOST, user=DB_USER, password=DB_PASSWORD, database=database, autocommit=False)
+    return pymysql.connect(host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASSWORD, database=database, autocommit=False)
 
 
 def ensure_tracking_table(db_name: str) -> None:

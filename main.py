@@ -56,3 +56,10 @@ app.include_router(platform_admin_router)
 @app.get("/")
 def root():
     return {"message": "Salvio API running", "status": "ok"}
+
+
+@app.get("/health")
+def health():
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+    return {"status": "ok"}
