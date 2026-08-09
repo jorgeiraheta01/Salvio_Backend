@@ -178,6 +178,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `is_active` tinyint(1) NOT NULL,
   `deleted_at` datetime DEFAULT NULL,
   `last_login_at` datetime DEFAULT NULL,
+  `sessions_invalidated_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
