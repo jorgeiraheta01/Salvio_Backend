@@ -137,3 +137,10 @@ class TenantTableStats(BaseModel):
     approx_rows: int
     size_mb: float
     last_updated: datetime | None
+
+
+class TenantLoginActivityEntry(BaseModel):
+    ip_address: str
+    last_seen: datetime
+    login_count: int
+    users: list[str]

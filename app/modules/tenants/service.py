@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator
 from uuid import UUID, uuid4
@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.database import DATABASE_URL
 from app.models.appointment import Appointment, AppointmentStatus
+from app.models.audit import AuditLog
 from app.models.billing import Billing, BillingStatus
 from app.models.encounter import Encounter
 from app.models.lab import LabOrder
@@ -1012,6 +1013,50 @@ def force_staff_logout(tenant_id: str, user_id: str) -> None:
     except SQLAlchemyError as exc:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Fallo el cierre de sesion forzado: {exc}") from exc
+    finally:
+        db.close()
+        tenant_engine.dispose()
+
+
+def tenant_login_activity(tenant_id: str, days: int = 30) -> list[dict]:
+    """IPs distintas que iniciaron sesion en esta clinica en los ultimos
+    `days` dias, para que el owner pueda ver quien esta accediendo. Se arma
+    en Python (no GROUP_CONCAT en SQL) para no depender de configuracion de
+    MySQL group_concat_max_len."""
+    safe_tenant_id, tenant_engine = _tenant_engine_or_404(tenant_id)
+    session_factory = sessionmaker(autocommit=False, autoflush=False, bind=tenant_engine)
+    db: Session = session_factory()
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        rows = (
+            db.query(AuditLog.ip_address, AuditLog.user_id, AuditLog.created_at)
+            .filter(
+                AuditLog.tenant_id == safe_tenant_id,
+                AuditLog.action == "LOGIN",
+                AuditLog.created_at >= cutoff,
+                AuditLog.ip_address.isnot(None),
+            )
+            .all()
+        )
+        user_ids = {row.user_id for row in rows if row.user_id is not None}
+        emails_by_id = {}
+        if user_ids:
+            for user in db.query(User.id, User.email).filter(User.id.in_(user_ids)).all():
+                emails_by_id[user.id] = user.email
+
+        by_ip: dict[str, dict] = {}
+        for row in rows:
+            entry = by_ip.setdefault(row.ip_address, {"ip_address": row.ip_address, "login_count": 0, "last_seen": row.created_at, "users": set()})
+            entry["login_count"] += 1
+            if row.created_at > entry["last_seen"]:
+                entry["last_seen"] = row.created_at
+            email = emails_by_id.get(row.user_id)
+            if email:
+                entry["users"].add(email)
+
+        results = [{**entry, "users": sorted(entry["users"])} for entry in by_ip.values()]
+        results.sort(key=lambda e: e["last_seen"], reverse=True)
+        return results
     finally:
         db.close()
         tenant_engine.dispose()

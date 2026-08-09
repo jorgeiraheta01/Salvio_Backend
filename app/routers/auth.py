@@ -25,7 +25,8 @@ from app.dependencies.auth import (
 )
 from app.dependencies.db import get_db
 from app.models.tenant import RevokedToken, Tenant, TenantStatus, User
-from app.routers._utils import audit_mutation, commit_or_409
+from app.routers._utils import audit_mutation, client_ip, commit_or_409
+from app.utils.audit import log_audit
 from app.schemas.auth import (
     LoginResponse,
     LogoutRequest,
@@ -121,6 +122,16 @@ def login(request: Request, data: LoginRequest):
             return LoginResponse(access_token="", refresh_token=None, requires_2fa=True, temp_token=temp_token)
 
         user.last_login_at = datetime.now(timezone.utc)
+        log_audit(
+            db,
+            tenant_id=tenant_id,
+            user_id=user.id,
+            action="LOGIN",
+            table_name="users",
+            record_id=user.id,
+            ip_address=client_ip(request),
+            user_agent=request.headers.get("user-agent"),
+        )
         db.commit()
 
         return LoginResponse(

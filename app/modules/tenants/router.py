@@ -12,6 +12,7 @@ from app.modules.tenants.schemas import (
     StaffSummary,
     StaffUpdateRequest,
     TenantDashboardResponse,
+    TenantLoginActivityEntry,
     TenantModuleSummary,
     TenantModuleUpdateRequest,
     TenantProvisionRequest,
@@ -36,6 +37,7 @@ from app.modules.tenants.service import (
     reset_tenant_staff_password,
     set_tenant_module,
     tenant_dashboard_stats,
+    tenant_login_activity,
     tenant_table_breakdown,
     tenant_technical_stats,
     update_tenant,
@@ -118,6 +120,15 @@ def get_tenant_database_tables(
     _current_admin: PlatformAdmin = Depends(get_current_platform_admin),
 ) -> list[TenantTableStats]:
     return [TenantTableStats(**t) for t in tenant_table_breakdown(tenant_id)]
+
+
+@router.get("/{tenant_id}/login-activity", response_model=list[TenantLoginActivityEntry])
+def get_tenant_login_activity(
+    tenant_id: str,
+    days: int = Query(default=30, ge=1, le=90),
+    _current_admin: PlatformAdmin = Depends(get_current_platform_admin),
+) -> list[TenantLoginActivityEntry]:
+    return [TenantLoginActivityEntry(**e) for e in tenant_login_activity(tenant_id, days)]
 
 
 @router.get("", response_model=list[TenantSummary])
