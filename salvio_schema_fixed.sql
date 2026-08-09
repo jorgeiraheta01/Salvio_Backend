@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS `patients` (
   `last_occupation` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `last_contribution_period` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `last_work_date` date DEFAULT NULL,
+  `is_referred` tinyint(1) NOT NULL DEFAULT '0',
   `deleted_at` datetime DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
